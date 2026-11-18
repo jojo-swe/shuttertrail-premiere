@@ -204,6 +204,26 @@ int wmain(int argc,wchar_t** argv) {
         run(indexed,indexOut,angle0);
         checkOutput(indexOut.c_str(),ticks,startFrame,count,true);
 
+        // Trims that start at the first frame or end at the last frame have no
+        // handle frame on that side. Frame selection and blur must still work.
+        auto runAt=[&](const std::wstring& src, const std::wstring& out, const wchar_t* from,
+                       const wchar_t* length, wchar_t* angle) {
+            std::wstring a(from), b(length);
+            wchar_t* args[]={nullptr,const_cast<wchar_t*>(src.c_str()),const_cast<wchar_t*>(out.c_str()),
+                             a.data(),b.data(),const_cast<wchar_t*>(ticksText.c_str()),angle,samples};
+            render(args);
+        };
+        const auto headIndex=(dir/L"head-index.mp4").wstring(), tailIndex=(dir/L"tail-index.mp4").wstring();
+        const auto headBlur=(dir/L"head-blur.mp4").wstring(), tailBlur=(dir/L"tail-blur.mp4").wstring();
+        runAt(indexed,headIndex,L"0",L"3",angle0);
+        checkOutput(headIndex.c_str(),ticks,0,3,true);
+        runAt(indexed,tailIndex,L"57",L"3",angle0);
+        checkOutput(tailIndex.c_str(),ticks,57,3,true);
+        runAt(source,headBlur,L"0",L"3",angle180);
+        checkOutput(headBlur.c_str(),ticks,0,3,false);
+        runAt(source,tailBlur,L"57",L"3",angle180);
+        checkOutput(tailBlur.c_str(),ticks,57,3,false);
+
         std::puts("Media Foundation round-trip passed");
     } catch (const std::exception& e) { std::fprintf(stderr,"%s\n",e.what()); status=1; }
     if (mf) MFShutdown();

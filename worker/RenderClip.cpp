@@ -102,6 +102,12 @@ struct Reader : VideoFormat {
              "Unsupported frame dimensions");
     }
     ComPtr<IMFSample> read(i64& timestamp) {
+        auto sample=tryRead(timestamp);
+        need(sample!=nullptr,"Source ended before the selected out point");
+        return sample;
+    }
+    // Returns null at the end of the stream.
+    ComPtr<IMFSample> tryRead(i64& timestamp) {
         for (;;) {
             DWORD flags=0; ComPtr<IMFSample> sample;
             check(source->ReadSample(video,0,nullptr,&flags,&timestamp,&sample),"Decode frame");
@@ -118,7 +124,7 @@ struct Reader : VideoFormat {
                 need(!MFGetAttributeUINT32(sample.Get(),MFSampleExtension_Interlaced,0),"Interlaced sample");
                 return sample;
             }
-            need(!(flags&MF_SOURCE_READERF_ENDOFSTREAM),"Source ended before the selected out point");
+            if (flags&MF_SOURCE_READERF_ENDOFSTREAM) return nullptr;
         }
     }
     Frame unpack(IMFSample* sample) const {
@@ -197,10 +203,14 @@ static void render(wchar_t** args) {
     // (edit lists and encoder delay). Later frames are measured from it.
     const i64 origin=pts;
     auto frameAt=[&](i64 timestamp){return reader.frameFor(timestamp-origin);};
-    if (start>0) {
+    // One frame on each side of the trim, when the source has it, gives the
+    // first and last frames the same blur as the rest instead of half of it.
+    const bool before=start>0;
+    const i64 begin=before?start-1:start;
+    if (begin>0) {
         // Seek slightly before the selection. Decoders may return a keyframe
         // earlier than requested; choose the frame by rounding, not a tolerance.
-        const i64 target=origin+reader.time(start);
+        const i64 target=origin+reader.time(begin);
         i64 seekPos=target-hns;
         if (seekPos<origin) seekPos=origin;
         auto seekTo=[&](i64 position){
@@ -210,29 +220,40 @@ static void render(wchar_t** args) {
             first=reader.read(pts);
         };
         seekTo(seekPos);
-        if (frameAt(pts)>start) seekTo(origin<0?origin:0);
-        while (frameAt(pts)<start) first=reader.read(pts);
+        if (frameAt(pts)>begin) seekTo(origin<0?origin:0);
+        while (frameAt(pts)<begin) first=reader.read(pts);
     }
-    auto validate=[&](i64 index){
+    auto validate=[&](i64 expected){
         const i64 got=frameAt(pts);
-        if (got==start+index) return;
+        if (got==expected) return;
         char s[256];
         std::snprintf(s,sizeof(s),
             "Frame timestamp mismatch at frame %lld (got %lld, pts %lld, origin %lld). Use constant-frame-rate media without gaps",
-            start+index,got,pts,origin);
+            expected,got,pts,origin);
         need(false,s);
     };
-    validate(0);
-    Frame current=reader.unpack(first.Get()), previous=current;
+    validate(begin);
+    Frame previous=reader.unpack(first.Get());
+    if (before) {
+        first=reader.read(pts);
+        validate(start);
+    }
+    Frame current=before?reader.unpack(first.Get()):previous;
     first.Reset();
     Writer writer(args[2],reader);
+    motion::Exposer exposer(samples,angle);
     for (i64 i=0; i<count; ++i) {
-        Frame next=current;
+        Frame next(0,0);
+        bool hasNext=false;
         if (i+1<count) {
-            auto s=reader.read(pts); validate(i+1); next=reader.unpack(s.Get());
+            auto s=reader.read(pts); validate(start+i+1); next=reader.unpack(s.Get()); hasNext=true;
+        } else if (auto s=reader.tryRead(pts); s && frameAt(pts)==start+count) {
+            next=reader.unpack(s.Get()); hasNext=true;
         }
-        // Clamp at both trim boundaries, even when more source footage exists.
-        writer.write(motion::expose(i?previous:current,current,i+1<count?next:current,samples,angle),i);
+        // Without a handle, pass the current frame itself to clamp at that edge.
+        const Frame& p=(i>0 || before)?previous:current;
+        const Frame& n=hasNext?next:current;
+        writer.write(exposer(p,current,n),i);
         previous=std::move(current); current=std::move(next);
         if (i%5==0 || i+1==count) { std::printf("%lld/%lld\n",i+1,count); std::fflush(stdout); }
     }
