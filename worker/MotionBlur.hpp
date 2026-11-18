@@ -154,8 +154,20 @@ struct Field {
                         if (sbest <= best) { bx = sx; by = sy; best = sbest; }
                     }
                     g.dx[row*g.cols+col] = bx; g.dy[row*g.cols+col] = by;
-                    if (k == 0)
-                        vectors[row*cols+col] = {float(bx),float(by),std::clamp(1.f-best/(36.f*28.f),0.f,1.f)};
+                    if (k == 0) {
+                        // A parabola through the matching error on each side of the
+                        // best whole-pixel vector places it between pixels, so slow
+                        // motion blurs by its real length instead of a rounded one.
+                        auto sad = [&](int dx, int dy) { return float(score(dx,dy) - std::abs(dx) - std::abs(dy)); };
+                        auto vertex = [](float minus, float centre, float plus) {
+                            const float curve = minus - 2*centre + plus;
+                            return curve > 0 ? std::clamp(0.5f*(minus-plus)/curve, -0.5f, 0.5f) : 0.f;
+                        };
+                        const float c = sad(bx,by);
+                        const float fx = vertex(sad(bx-1,by), c, sad(bx+1,by));
+                        const float fy = vertex(sad(bx,by-1), c, sad(bx,by+1));
+                        vectors[row*cols+col] = {bx+fx, by+fy, std::clamp(1.f-best/(36.f*28.f),0.f,1.f)};
+                    }
                 }
             });
         }

@@ -28,6 +28,19 @@ Byte smooth(int x,int y,unsigned salt) {
     return Byte(32+(1-fy)*((1-fx)*lattice(gx,gy,salt)+fx*lattice(gx+1,gy,salt))
                   +fy*((1-fx)*lattice(gx,gy+1,salt)+fx*lattice(gx+1,gy+1,salt)));
 }
+// The same noise sampled at a fractional horizontal offset.
+Frame shifted(float offset) {
+    Frame f(192,128);
+    for (int y=0;y<f.height;++y) for (int x=0;x<f.width;++x) {
+        float u=(x-offset+60)/6.f, v=y/6.f;
+        int gx=int(std::floor(u)), gy=int(std::floor(v));
+        float fx=u-gx, fy=v-gy;
+        f.pixels[y*f.width+x]=Byte(32+(1-fy)*((1-fx)*lattice(gx,gy,3)+fx*lattice(gx+1,gy,3))
+                                      +fy*((1-fx)*lattice(gx,gy+1,3)+fx*lattice(gx+1,gy+1,3)));
+    }
+    std::fill(f.pixels.begin()+f.width*f.height,f.pixels.end(),128);
+    return f;
+}
 Frame occlusion(int left) {
     Frame f(320,200);
     for (int y=0;y<f.height;++y) for (int x=0;x<f.width;++x) {
@@ -99,6 +112,15 @@ int main() {
         tally(raw,wrongRaw,rightRaw); tally(checked,wrongChecked,rightChecked);
         assert(wrongRaw>1 && wrongChecked<wrongRaw*0.5f);
         assert(rightRaw>=60 && rightChecked*100>=rightRaw*95);
+    }
+    // Motion between whole pixels is measured, not rounded.
+    for (float motion : {0.5f, 1.25f, 2.5f, 3.75f}) {
+        auto a=shifted(0), b=shifted(motion);
+        Field f(a,b);
+        float worst=0;
+        for (float x=48;x<=144;x+=24) for (float y=36;y<=92;y+=28)
+            worst=std::max(worst,std::abs(f.at(x,y).x-motion));
+        assert(worst<0.25f);
     }
     // The streaming renderer reuses each field for its neighbour and must
     // produce exactly what independent calls produce, including clamped ends.
