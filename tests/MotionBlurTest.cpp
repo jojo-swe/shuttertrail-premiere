@@ -134,5 +134,25 @@ int main() {
             assert(stream(p,clip[n],q).pixels==expose(p,clip[n],q,8,180).pixels);
         }
     }
+    // Shutter phase moves the exposure window. Trailing at 180° (phase -90°)
+    // samples only the past, so the next frame cannot change it; leading
+    // (phase +90°) samples only the future. Centred uses both.
+    {
+        auto other=texture(9);
+        assert(expose(prev,current,next,8,180,-90).pixels==expose(prev,current,other,8,180,-90).pixels);
+        assert(expose(prev,current,next,8,180,90).pixels==expose(other,current,next,8,180,90).pixels);
+        assert(expose(prev,current,next,8,180,0).pixels!=expose(prev,current,other,8,180,0).pixels);
+        assert(expose(prev,current,next,8,180,0).pixels==expose(prev,current,next,8,180).pixels);
+    }
+    // Strength mixes the blur with the original frame: 0% is the original,
+    // 100% the full blur, and 50% lies halfway within rounding.
+    {
+        auto none=expose(prev,current,next,8,360,0,0), half=expose(prev,current,next,8,360,0,50);
+        assert(none.pixels==current.pixels);
+        assert(expose(prev,current,next,8,360,0,100).pixels==full.pixels);
+        for (size_t i=0;i<half.pixels.size();++i)
+            assert(std::abs(2*int(half.pixels[i])-int(current.pixels[i])-int(full.pixels[i]))<=2);
+        assert(half.pixels!=current.pixels && half.pixels!=full.pixels);
+    }
     std::cout<<"Motion tests passed\n";
 }

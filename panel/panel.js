@@ -7,13 +7,13 @@
     const worker = path.join(path.dirname(fileURLToPath(location.href)), 'bin', 'MotionBlurWorker.exe');
     const el = id => document.getElementById(id);
     let child = null, cancelled = false, previewDir = '', images = null;
-    const controls = ['render','preview','samples','angle'];
+    const controls = ['render','preview','settings'];
     const busy = on => { for (const id of controls) el(id).disabled = on; };
-    // Remember the last shutter angle and sample count. Storage can be
-    // unavailable, so every access is optional.
+    // Remember the last settings. Storage can be unavailable, so every
+    // access is optional.
     const saved = key => { try { return localStorage.getItem('shuttertrail.'+key); } catch (_) { return null; } };
     const save = (key,value) => { try { localStorage.setItem('shuttertrail.'+key,value); } catch (_) {} };
-    for (const id of ['angle','samples']) {
+    for (const id of ['angle','samples','strength']) {
         const input = el(id), value = saved(id);
         // Restore only a value the control can show.
         const valid = input.options
@@ -23,8 +23,48 @@
         if (valid) input.value = value;
         input.addEventListener('change', () => save(id, input.value));
     }
-    el('angle').oninput = () => { el('degrees').textContent = el('angle').value + '°'; };
-    el('angle').oninput();
+    const radios = [...document.querySelectorAll('input[name=position]')];
+    for (const radio of radios) {
+        if (radio.value === saved('position')) radio.checked = true;
+        radio.addEventListener('change', () => save('position', radio.value));
+    }
+    const position = () => radios.find(r => r.checked).value;
+    // Shutter phase for the worker, in degrees: where the open time sits around the frame.
+    const phase = () => Math.round({behind:-1, centered:0, ahead:1}[position()] * el('angle').value / 2);
+    // Keeps the shutter disc, the read-outs and the presets in step with the controls.
+    function update() {
+        const angle = +el('angle').value;
+        el('degrees').textContent = angle + '°';
+        el('percent').textContent = el('strength').value + '%';
+        el('disc').style.setProperty('--open', angle + 'deg');
+        el('disc').style.setProperty('--start', (phase() - angle/2) + 'deg');
+        const open = angle === 0 ? 'Shutter off: no blur.'
+                   : angle === 360 ? 'Open for the whole frame.'
+                   : angle === 180 ? 'Open for half of each frame.'
+                   : 'Open for ' + Math.round(angle/3.6) + '% of each frame.';
+        el('exposure').textContent = open + (angle === 0 ? '' : {
+            behind: ' The blur trails behind moving objects.',
+            centered: ' The blur is centered on each frame.',
+            ahead: ' The blur runs ahead of moving objects.'}[position()]);
+        for (const b of document.querySelectorAll('[data-angle]'))
+            b.setAttribute('aria-pressed', String(+b.dataset.angle === angle));
+    }
+    for (const b of document.querySelectorAll('[data-angle]'))
+        b.addEventListener('click', () => {
+            el('angle').value = b.dataset.angle;
+            el('angle').dispatchEvent(new Event('change', {bubbles:true}));
+        });
+    // Any setting change redraws, and refreshes a preview that is on screen.
+    let refresh = null, stale = false;
+    function schedulePreview() {
+        if (el('figure').hidden) return;
+        clearTimeout(refresh);
+        refresh = setTimeout(() => { if (child) stale = true; else el('preview').click(); }, 350);
+    }
+    el('settings').addEventListener('input', update);
+    el('settings').addEventListener('change', () => { update(); schedulePreview(); });
+    update();
+    const shutter = () => [el('angle').value, el('samples').value, String(phase()), el('strength').value];
     function host(script) {
         return new Promise((resolve,reject) => window.__adobe_cep__.evalScript(script, result => {
             try {
@@ -90,12 +130,13 @@
             const base=path.join(previewDir,'frame'), angle=el('angle').value;
             el('cancel').hidden=false;
             el('status').textContent='Rendering preview …';
-            await run(['--preview',source,base,frame,ticks,angle,el('samples').value]);
+            await run(['--preview',source,base,frame,ticks,...shutter()]);
             const image=file => 'data:image/bmp;base64,'+fs.readFileSync(file).toString('base64');
             images={blurred:image(base+'.bmp'), original:image(base+'-original.bmp')};
             removePreview();
             el('image').src=images.blurred;
             el('figure').hidden=false;
+            el('compare').hidden=false;
             el('caption').textContent='Clip frame '+(Number(at)+1)+' of '+count+' at '+angle+'°.'+
                 (inside==='1' ? '' : ' The playhead is outside the clip, so the nearest clip frame is shown.');
             el('status').textContent='Ready.';
@@ -105,6 +146,7 @@
         } finally {
             el('cancel').hidden=true;
             busy(false);
+            if (stale) { stale=false; schedulePreview(); }
         }
     };
     // Hold the button (mouse, touch or Space/Enter) to see the original frame.
@@ -118,6 +160,7 @@
     el('render').onclick=async () => {
         let job='', completed='';
         cancelled=false;
+        el('reveal').hidden=true;
         busy(true);
         try {
             const clip=await host('MotionBlurTimeline.inspect()');
@@ -132,7 +175,7 @@
             el('progress').hidden=false;
             el('progress').removeAttribute('value');
             el('status').textContent='Opening the source clip …';
-            await run([source,output,start,count,ticks,el('angle').value,el('samples').value]);
+            await run([source,output,start,count,ticks,...shutter()]);
             completed=output;
             el('cancel').hidden=true;
             el('status').textContent='Importing and verifying placement …';
@@ -140,6 +183,11 @@
             await host('MotionBlurTimeline.place('+JSON.stringify(clip.raw)+','+
                        JSON.stringify(encodeURIComponent(output))+')');
             el('status').textContent='Done on V'+target+'.\n'+output;
+            el('reveal').hidden=false;
+            el('reveal').onclick=() => {
+                // Explorer needs the quotes inside its /select argument.
+                spawn('explorer.exe',['/select,"'+output+'"'],{windowsVerbatimArguments:true}).on('error',() => {});
+            };
         } catch (error) {
             let message=error.message;
             if (completed) message+='\nRender file: '+completed;

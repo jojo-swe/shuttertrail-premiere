@@ -246,6 +246,31 @@ int wmain(int argc,wchar_t** argv) {
             if (std::wstring(suffix)==L"-original.bmp")
                 need(std::abs(grey(8,8)-224)<=6 && std::abs(grey(24,8)-19)<=6,"Preview shows the wrong source frame");
         }
+        // The optional shutter phase and strength reach the engine: strength 0
+        // gives the original frame. A phase without a strength is refused.
+        {
+            const auto base=(dir/L"preview-none").wstring();
+            std::wstring frameText(L"37"), phase(L"-90"), strength(L"0");
+            wchar_t* args[]={nullptr,const_cast<wchar_t*>(source.c_str()),const_cast<wchar_t*>(base.c_str()),
+                             frameText.data(),const_cast<wchar_t*>(ticksText.c_str()),angle180,samples,
+                             phase.data(),strength.data()};
+            renderPreview(args,9);
+            auto read=[](const std::wstring& path){
+                std::vector<unsigned char> bytes(std::filesystem::file_size(path));
+                FILE* f=nullptr;
+                need(_wfopen_s(&f,path.c_str(),L"rb")==0 && f,"Open preview image");
+                const size_t got=std::fread(bytes.data(),1,bytes.size(),f);
+                std::fclose(f);
+                need(got==bytes.size(),"Read preview image");
+                return bytes;
+            };
+            need(read(base+L".bmp")==read(base+L"-original.bmp"),"Strength 0 must give the original frame");
+            const auto other=(dir/L"preview-bad").wstring();
+            args[2]=const_cast<wchar_t*>(other.c_str());
+            bool refused=false;
+            try { renderPreview(args,8); } catch (const std::exception&) { refused=true; }
+            need(refused,"A shutter phase without a strength must be refused");
+        }
 
         std::puts("Media Foundation round-trip passed");
     } catch (const std::exception& e) { std::fprintf(stderr,"%s\n",e.what()); status=1; }

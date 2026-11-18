@@ -31,7 +31,7 @@ if errorlevel 1 (
     echo Test files are available at "%PMB_FIXTURE%"
     exit /b 1
 )
-del /q "%PMB_FIXTURE%\*.mp4"
+del /q "%PMB_FIXTURE%\*.mp4" "%PMB_FIXTURE%\*.bmp"
 rmdir "%PMB_FIXTURE%"
 popd
 popd

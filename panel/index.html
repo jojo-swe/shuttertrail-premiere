@@ -1,19 +1,62 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src data:">
-<title>Motion Blur</title><link rel="stylesheet" href="panel.css"></head>
+<title>ShutterTrail</title><link rel="stylesheet" href="panel.css"></head>
 <body><main>
-<h1>Motion Blur</h1>
-<p>Select an H.264 clip with the same frame rate as the sequence. The image is read from the source file before effects and transforms.</p>
-<div class="label"><label for="angle">Shutter angle</label><output id="degrees" for="angle">180°</output></div>
+<header>
+<h1>ShutterTrail</h1>
+<p>Adds camera-style motion blur to the selected H.264 clip. It needs the same frame rate as the sequence and reads the source file before effects and transforms.</p>
+</header>
+<fieldset id="settings">
+<section class="shutter" aria-labelledby="shutter-heading">
+<h2 id="shutter-heading">Shutter</h2>
+<div class="dial">
+<div id="disc" class="disc" aria-hidden="true"></div>
+<div>
+<output id="degrees" for="angle">180°</output>
+<p id="exposure" class="hint">Open for half of each frame.</p>
+</div>
+</div>
+<label for="angle" class="visually-hidden">Shutter angle</label>
 <input type="range" id="angle" min="0" max="360" step="5" value="180">
-<label for="samples">Exposure samples per frame</label>
-<select id="samples"><option>4</option><option selected>8</option><option>16</option></select>
-<button id="preview" class="secondary">Preview at playhead</button>
+<div class="presets" role="group" aria-label="Shutter angle presets">
+<button type="button" data-angle="0">Off</button><button type="button" data-angle="90">90°</button><button type="button" data-angle="180">180°</button><button type="button" data-angle="270">270°</button><button type="button" data-angle="360">360°</button>
+</div>
+<div class="segmented" role="radiogroup" aria-labelledby="position-label">
+<span id="position-label" class="row-label">Blur position</span>
+<label><input type="radio" name="position" value="behind"><span>Behind</span></label>
+<label><input type="radio" name="position" value="centered" checked><span>Centered</span></label>
+<label><input type="radio" name="position" value="ahead"><span>Ahead</span></label>
+</div>
+</section>
+<section aria-labelledby="look-heading">
+<h2 id="look-heading">Look</h2>
+<div class="row"><label for="strength" class="row-label">Strength</label><output id="percent" for="strength">100%</output></div>
+<input type="range" id="strength" min="0" max="100" step="5" value="100">
+<div class="row"><label for="samples" class="row-label">Quality</label></div>
+<select id="samples">
+<option value="4">Draft: 4 samples per frame</option>
+<option value="8" selected>Standard: 8 samples per frame</option>
+<option value="16">High: 16 samples per frame</option>
+<option value="32">Maximum: 32 samples per frame</option>
+</select>
+</section>
+</fieldset>
+<section aria-labelledby="preview-heading">
+<h2 id="preview-heading">Preview</h2>
 <figure id="figure" hidden><img id="image" alt="Preview of the frame under the playhead">
-<figcaption id="caption"></figcaption>
-<button id="compare" class="secondary">Hold to compare with the original</button></figure>
-<button id="render">Render to track above</button>
-<button id="cancel" hidden>Cancel</button>
-<progress id="progress" hidden></progress><p id="status" role="status" aria-live="polite">Ready.</p>
+<figcaption id="caption"></figcaption></figure>
+<div class="pair">
+<button id="preview" class="secondary">Preview at playhead</button>
+<button id="compare" class="secondary" hidden>Hold to see original</button>
+</div>
+<p class="hint">After the first preview, changing a setting updates it.</p>
+</section>
+<section class="output">
+<button id="render" class="primary">Render to track above</button>
+<button id="cancel" class="secondary" hidden>Cancel</button>
+<progress id="progress" hidden></progress>
+<p id="status" role="status" aria-live="polite">Ready.</p>
+<button id="reveal" class="secondary" hidden>Show render in Explorer</button>
+</section>
 </main><script src="panel.js"></script></body></html>

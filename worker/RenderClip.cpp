@@ -196,7 +196,7 @@ struct Writer {
 // sink(reader, original, blurred, index). Full renders and previews share it.
 template <class Sink>
 static void process(const wchar_t* file, i64 start, i64 count, i64 ticksPerFrame,
-                    int angle, int samples, Sink&& sink) {
+                    int angle, int samples, int phase, int strength, Sink&& sink) {
     Reader reader(file,ticksPerFrame);
     i64 pts=0;
     auto first=reader.read(pts);
@@ -241,7 +241,7 @@ static void process(const wchar_t* file, i64 start, i64 count, i64 ticksPerFrame
     }
     Frame current=before?reader.unpack(first.Get()):previous;
     first.Reset();
-    motion::Exposer exposer(samples,angle);
+    motion::Exposer exposer(samples,angle,phase,strength);
     for (i64 i=0; i<count; ++i) {
         Frame next(0,0);
         bool hasNext=false;
@@ -258,15 +258,27 @@ static void process(const wchar_t* file, i64 start, i64 count, i64 ticksPerFrame
     }
 }
 
-static void render(wchar_t** args) {
+// Optional shutter phase (-180..180 degrees) and strength (0..100 percent)
+// follow the required arguments. count is the number of entries in args.
+static void options(wchar_t** args, int count, int first, int& phase, int& strength) {
+    phase=0; strength=100;
+    need(count==first || count==first+2,"Expected shutter phase and strength together");
+    if (count==first) return;
+    phase=int(integer(args[first],-180,180));
+    strength=int(integer(args[first+1],0,100));
+}
+
+static void render(wchar_t** args, int argCount=8) {
     // The panel reserves a private directory per job. Also refuse to
     // overwrite a file if someone invokes this executable directly.
     need(GetFileAttributesW(args[2])==INVALID_FILE_ATTRIBUTES,"Output already exists");
     const i64 start=integer(args[3],0,100000000), count=integer(args[4],1,100000000);
     const i64 ticksPerFrame=integer(args[5],1000000,adobeTicks);
     const int angle=int(integer(args[6],0,360)), samples=int(integer(args[7],1,32));
+    int phase, strength;
+    options(args,argCount,8,phase,strength);
     std::optional<Writer> writer;
-    process(args[1],start,count,ticksPerFrame,angle,samples,
+    process(args[1],start,count,ticksPerFrame,angle,samples,phase,strength,
             [&](const Reader& reader, const Frame&, const Frame& blurred, i64 i) {
         if (!writer) writer.emplace(args[2],reader);
         writer->write(blurred,i);
@@ -284,15 +296,17 @@ static preview::Colour colourOf(const Reader& reader) {
     return colour;
 }
 
-// --preview input outputBase frame ticksPerFrame angle samples
+// --preview input outputBase frame ticksPerFrame angle samples [phase strength]
 // Writes outputBase.bmp (blurred) and outputBase-original.bmp for one frame.
-static void renderPreview(wchar_t** args) {
+static void renderPreview(wchar_t** args, int argCount=7) {
     const std::wstring base(args[2]), blurredFile=base+L".bmp", originalFile=base+L"-original.bmp";
     for (const auto& f : {blurredFile,originalFile})
         need(GetFileAttributesW(f.c_str())==INVALID_FILE_ATTRIBUTES,"Output already exists");
     const i64 frame=integer(args[3],0,100000000), ticksPerFrame=integer(args[4],1000000,adobeTicks);
     const int angle=int(integer(args[5],0,360)), samples=int(integer(args[6],1,32));
-    process(args[1],frame,1,ticksPerFrame,angle,samples,
+    int phase, strength;
+    options(args,argCount,7,phase,strength);
+    process(args[1],frame,1,ticksPerFrame,angle,samples,phase,strength,
             [&](const Reader& reader, const Frame& original, const Frame& blurred, i64) {
         const auto colour=colourOf(reader);
         need(preview::writeFile(blurredFile,preview::toBmp(blurred,colour)),"Could not write the preview image");
@@ -302,17 +316,17 @@ static void renderPreview(wchar_t** args) {
 
 #ifndef MOTION_BLUR_TEST_DRIVER
 int wmain(int argc,wchar_t** argv) {
-    const bool previewMode=argc==8 && std::wcscmp(argv[1],L"--preview")==0;
-    if (argc!=8) {
-        std::fputs("Usage: MotionBlurWorker input output.mp4 startFrame frameCount ticksPerFrame angle samples\n"
-                   "       MotionBlurWorker --preview input outputBase frame ticksPerFrame angle samples\n",stderr);
+    const bool previewMode=argc>1 && std::wcscmp(argv[1],L"--preview")==0;
+    if (argc!=8 && argc!=10) {
+        std::fputs("Usage: MotionBlurWorker input output.mp4 startFrame frameCount ticksPerFrame angle samples [phase strength]\n"
+                   "       MotionBlurWorker --preview input outputBase frame ticksPerFrame angle samples [phase strength]\n",stderr);
         return 2;
     }
     bool com=false,mf=false; int status=0;
     try {
         check(CoInitializeEx(nullptr,COINIT_MULTITHREADED),"Initialize COM"); com=true;
         check(MFStartup(MF_VERSION),"Start Media Foundation"); mf=true;
-        if (previewMode) renderPreview(argv+1); else render(argv);
+        if (previewMode) renderPreview(argv+1,argc-1); else render(argv,argc);
     } catch (const std::exception& e) { std::fprintf(stderr,"%s\n",e.what()); status=1; }
     if (mf) MFShutdown();
     if (com) CoUninitialize();

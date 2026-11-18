@@ -4,7 +4,12 @@ State on 2026-11-18, written at the end of a cloud session so that work can cont
 
 ## Where things stand
 
-- **`main` is green.** Windows CI (`windows.yml`) passes on every merged commit. Nothing is in flight: no open pull requests and no unpushed work.
+- **`main` is green.** Windows CI (`windows.yml`) passes on every merged commit.
+
+## In progress
+
+- **`agent/claude/panel-refresh-controls`** (Claude Code, 2026-11-18): redesigned panel with a shutter disc, blur position (Behind/Centered/Ahead), strength, angle presets, 32-sample quality, live preview refresh and **Show render in Explorer**. The engine and worker take optional `phase strength`. Built and all tests passed locally with VS 18, and in WSL Ubuntu (g++ 13) with `-Wall -Wextra -Wshadow`, `-fsanitize=thread` and `-fsanitize=address,undefined`. Not yet tried inside Premiere. PR #9.
+  - Measured in WSL on 6 cores, 1080p, 8 px/frame motion, 8 samples, median of 7: default 180° takes 0.271 s/frame on `main` and 0.265 s/frame on the branch, and the output is byte-identical. Trailing 180° takes 0.276 s and strength 50 % 0.255 s. Mean luma change against the original: 1.87 (default), 0.92 (strength 50 %, half as expected), 14.6 (trailing, larger because the trailing window shifts the image back by a quarter of the motion).
 - **Releases** (both are unpublished drafts, visible only to maintainers under *Releases*):
   - `v0.1.0-rc.2`: **the current candidate**, built from `main` at `11133df` (merge of #6). It contains everything listed below.
   - `v0.1.0-rc.1`: obsolete. It predates the engine work and can be deleted.
@@ -36,6 +41,7 @@ Measured on synthetic frames in a 4-core container:
    - The first and last frames of a trimmed clip look as blurred as the middle.
    - Placement on the track above at 23.976, 25 and 29.97 fps. Colours match the source.
    - Render time on a real clip. The panel shows time left.
+   - The new controls: the shutter disc follows angle and blur position, **Behind** trails moving objects, **Strength** 50 % looks halfway, the preview refreshes after a change, **Show render in Explorer** selects the file.
 2. **Publish that candidate** when it's good, and delete the older drafts.
 3. **Upload the social preview.** Go to *Settings → General → Social preview* and upload `.github/social-preview.png`. There is no API for this.
 4. **Look at Devin's flag on #5.** Devin Review reported one flag on PR #5 that is only visible in its app, at https://app.devin.ai/review/jojo-swe/shuttertrail-premiere/pull/5. Devin's later review of #6 found no issues.
@@ -73,3 +79,7 @@ Install.cmd            :: copies the panel and worker into the CEP extensions fo
 - **Debugging the panel:** put a `.debug` file in the installed extension folder that maps `com.shuttertrail.premiere.panel` to a port, for example 8088. Restart Premiere, then open `http://localhost:8088` in Chrome for DevTools. Don't commit that file.
 - **Reinstalling after a change** to `panel/` or the worker: close Premiere and run `Install.cmd` again. It rebuilds only when `build\MotionBlurWorker.exe` is missing, so run `Build.cmd` first after worker changes.
 - **Claude Code** reads `CLAUDE.md`, which imports `AGENTS.md` and this file. Cursor, Codex and Devin read `AGENTS.md`.
+
+## Log
+
+- 2026-11-18, Claude Code: panel redesign and new controls (blur position, strength, presets, 32 samples, live preview refresh, Show in Explorer) on `agent/claude/panel-refresh-controls`; Build.cmd now also cleans up preview BMPs.

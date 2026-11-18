@@ -43,8 +43,9 @@ For any change to `MotionBlur.hpp` or `Preview.hpp`, also run the tests under `-
 - **`Timeline.jsx` is ExtendScript (ES3).** Don't use `let`, `const`, arrow functions, `JSON` or template strings. Replies are URI-encoded fields joined with `|`, starting with `OK` or `ERR`.
 - **Interfaces that change together:**
   - The worker command line, used by `panel.js` and by `tests/MediaFoundationTest.cpp`:
-    - `input output.mp4 start count ticksPerFrame angle samples`
-    - `--preview input outputBase frame ticksPerFrame angle samples`
+    - `input output.mp4 start count ticksPerFrame angle samples [phase strength]`
+    - `--preview input outputBase frame ticksPerFrame angle samples [phase strength]`
+    - `phase` is -180..180 degrees (0 centred, -angle/2 trailing), `strength` 0..100 %. Both or neither.
   - The field order of `inspect()` and `preview()`, used by `panel.js`. `place()` compares the whole `inspect()` state string.
 - **`.cmd` files are CRLF** through `.gitattributes`. Edit them so they stay CRLF.
 - **English only** in the UI, messages, comments and docs.
