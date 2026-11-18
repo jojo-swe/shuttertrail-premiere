@@ -8,7 +8,7 @@ State on 2026-11-18, written at the end of a cloud session so that work can cont
 
 ## In progress
 
-- **`agent/claude/panel-refresh-controls`** (Claude Code, 2026-11-18): redesigned panel with a shutter disc, blur position (Behind/Centered/Ahead), strength, angle presets, 32-sample quality, live preview refresh and **Show render in Explorer**. The engine and worker take optional `phase strength`. Built and all tests passed locally with VS 18, and in WSL Ubuntu (g++ 13) with `-Wall -Wextra -Wshadow`, `-fsanitize=thread` and `-fsanitize=address,undefined`. Not yet tried inside Premiere. PR #9.
+- **`agent/claude/panel-refresh-controls`** (Claude Code, 2026-11-18): redesigned panel with a shutter disc, blur position (Behind/Centered/Ahead), strength, angle presets, 32-sample quality, live preview refresh and **Show render in Explorer**. The engine and worker take optional `phase strength`. Built and all tests passed locally with VS 18, and in WSL Ubuntu (g++ 13) with `-Wall -Wextra -Wshadow`, `-fsanitize=thread` and `-fsanitize=address,undefined`. Not yet tried inside Premiere. PR #9. Draft release **`v0.1.0-rc.4`** is built from this branch (with Run workflow, so there is no git tag until it is published); `v0.1.0-rc.3` is `main` at `840b18c` without these controls.
   - Measured in WSL on 6 cores, 1080p, 8 px/frame motion, 8 samples, median of 7: default 180° takes 0.271 s/frame on `main` and 0.265 s/frame on the branch, and the output is byte-identical. Trailing 180° takes 0.276 s and strength 50 % 0.255 s. Mean luma change against the original: 1.87 (default), 0.92 (strength 50 %, half as expected), 14.6 (trailing, larger because the trailing window shifts the image back by a quarter of the motion).
 - **Releases** (both are unpublished drafts, visible only to maintainers under *Releases*):
   - `v0.1.0-rc.2`: **the current candidate**, built from `main` at `11133df` (merge of #6). It contains everything listed below.
@@ -83,3 +83,4 @@ Install.cmd            :: copies the panel and worker into the CEP extensions fo
 ## Log
 
 - 2026-11-18, Claude Code: panel redesign and new controls (blur position, strength, presets, 32 samples, live preview refresh, Show in Explorer) on `agent/claude/panel-refresh-controls`; Build.cmd now also cleans up preview BMPs.
+- 2026-11-18, Claude Code: sanitizer runs and 1080p measurements for PR #9; CHANGELOG split into rc.3 and rc.4; draft release v0.1.0-rc.4 started from `agent/claude/panel-refresh-controls`.

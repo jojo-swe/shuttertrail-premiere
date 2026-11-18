@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (planned as 0.1.0-rc.3)
+## Unreleased (planned as 0.1.0-rc.4)
 
 ### New
 - **Redesigned panel.** Settings are grouped into Shutter, Look, Preview and Render. A shutter disc shows how long the shutter is open and where that time sits around the frame.
@@ -10,14 +10,16 @@
 - The preview updates by itself when a setting changes, and **Show render in Explorer** appears after a render.
 - The worker accepts optional `phase strength` arguments after `angle samples`, in both render and preview mode. Older command lines still work.
 
+### Build
+- **Build.cmd** also removes the preview images from its temporary test folder, so the folder no longer stays behind.
+
+## 0.1.0-rc.3 (draft, not published)
+
 ### Fixed
 - **The panel could be missing from Window → Extensions in newer Premiere versions.** The manifest no longer stops at Premiere 26, and **Install.cmd** enables unsigned panels for CSXS 11–15 instead of only 11–12.
 
 ### Docs
 - README: troubleshooting steps for a panel that does not appear.
-
-### Build
-- **Build.cmd** also removes the preview images from its temporary test folder, so the folder no longer stays behind.
 
 ## 0.1.0-rc.2 (draft, not published)
 
