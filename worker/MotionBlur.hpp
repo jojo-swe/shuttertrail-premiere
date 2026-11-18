@@ -216,9 +216,14 @@ inline void crossCheck(Field& field, const Field& reverse) {
     }
 }
 
+// phase (degrees, -180..180) moves the exposure window: 0 centres it on the
+// frame, -angle/2 makes it end at the frame (trailing blur). strength (0..100)
+// mixes the blurred result with the original.
 inline Frame blend(const Frame& prev, const Frame& cur, const Frame& next,
-                   const Field& backward, const Field& forward, int samples, int angle) {
+                   const Field& backward, const Field& forward, int samples, int angle,
+                   int phase=0, int strength=100) {
     Frame out=cur;
+    const float mix=strength/100.f;
     for (int plane=0; plane<2; ++plane) {
         bool uv=plane==1;
         int scale=uv?2:1, offset=uv?cur.width*cur.height:0;
@@ -230,8 +235,8 @@ inline Frame blend(const Frame& prev, const Frame& cur, const Frame& next,
                     int idx=offset+y*cur.width+x*scale+lane;
                     float center=cur.pixels[idx], sum=0;
                     for (int k=0; k<samples; ++k) {
-                        float phase=((k+0.5f)/samples-0.5f)*(angle/360.f);
-                        int side=phase>=0; float t=std::abs(phase);
+                        float at=((k+0.5f)/samples-0.5f)*(angle/360.f)+phase/360.f;
+                        int side=at>=0; float t=std::abs(at);
                         const auto& v=fields[side];
                         if (v.confidence<=0) { sum+=center; continue; }
                         float dx=v.x/scale, dy=v.y/scale;
@@ -240,7 +245,7 @@ inline Frame blend(const Frame& prev, const Frame& cur, const Frame& next,
                         float b=sample(other,uv,lane,x+(1-t)*dx,y+(1-t)*dy);
                         sum+=center+v.confidence*((1-t)*a+t*b-center);
                     }
-                    out.pixels[idx]=Byte(std::clamp(std::lround(sum/samples),0L,255L));
+                    out.pixels[idx]=Byte(std::clamp(std::lround(center+mix*(sum/samples-center)),0L,255L));
                 }
             }
         });
@@ -253,22 +258,24 @@ inline Frame blend(const Frame& prev, const Frame& cur, const Frame& next,
 // Each call's cur and next must be the next call's prev and cur. Pass the
 // same object as prev (or next) to clamp at the start (or end) of the footage.
 class Exposer {
-    int samples, angle;
+    int samples, angle, phase, strength;
     std::optional<Field> backward, reverseBackward;
 public:
-    Exposer(int samplesPerFrame, int shutterAngle) : samples(samplesPerFrame), angle(shutterAngle) {}
+    Exposer(int samplesPerFrame, int shutterAngle, int shutterPhase=0, int blurStrength=100)
+        : samples(samplesPerFrame), angle(shutterAngle), phase(shutterPhase), strength(blurStrength) {}
     Frame operator()(const Frame& prev, const Frame& cur, const Frame& next) {
-        if (angle==0) return cur;
+        if (angle==0 || strength==0) return cur;
         Field b=backward ? std::move(*backward) : Field(cur,prev);
         Field rb=reverseBackward ? std::move(*reverseBackward) : Field(prev,cur);
         Field f(cur,next), rf(next,cur);
         backward=rf; reverseBackward=f;
         crossCheck(b,rb); crossCheck(f,rf);
-        return blend(prev,cur,next,b,f,samples,angle);
+        return blend(prev,cur,next,b,f,samples,angle,phase,strength);
     }
 };
 
-inline Frame expose(const Frame& prev, const Frame& cur, const Frame& next, int samples, int angle) {
-    return Exposer(samples,angle)(prev,cur,next);
+inline Frame expose(const Frame& prev, const Frame& cur, const Frame& next, int samples, int angle,
+                    int phase=0, int strength=100) {
+    return Exposer(samples,angle,phase,strength)(prev,cur,next);
 }
 }

@@ -1,10 +1,67 @@
-:root { color-scheme:dark; font:14px/1.5 "Segoe UI",sans-serif; background:#202125; color:#f0f1f4 }
-body { margin:0 } main { max-width:36rem; padding:1.2rem; margin:auto } h1 { font-size:1.4rem; margin:0 }
-p { color:#c8cad2 } .label { display:flex; justify-content:space-between } output { color:#a9c9ff }
-input,select,button,progress { width:100%; box-sizing:border-box; margin:.35rem 0 .9rem; accent-color:#93baff }
-select,button { padding:.5rem; border-radius:5px; font:inherit; border:1px solid #626671 }
-button { background:#a7c7ff; color:#101c32; font-weight:600; cursor:pointer } button:disabled { opacity:.5 }
-#cancel { background:transparent; color:#ddd } #status { white-space:pre-wrap; overflow-wrap:anywhere; margin:.3rem 0 }
-.secondary { background:transparent; color:#cfe0ff; border-color:#7b8fb5 }
-figure { margin:0 0 .9rem } #image { display:block; width:100%; height:auto; border-radius:4px; background:#000 }
-figcaption { color:#c8cad2; font-size:.9rem; margin:.3rem 0 0 } #compare { margin-bottom:0; user-select:none; touch-action:none }
+/* Graphite to sit inside Premiere's dark UI; amber is the light through an open shutter. */
+:root {
+    color-scheme: dark;
+    --ground: #1f2023; --raised: #292a2e; --line: #3b3d43; --text: #ebe9e4; --muted: #a0a3ab;
+    --amber: #f2a93b; --amber-ink: #22160a; --amber-dim: #6b4a1d;
+    font: 13px/1.5 "Segoe UI Variable Text", "Segoe UI", sans-serif;
+    background: var(--ground); color: var(--text);
+}
+body { margin: 0; background: var(--ground) }
+main { max-width: 30rem; padding: 1rem 1rem 1.4rem; margin: auto }
+header h1 { font-size: 1.35rem; font-weight: 700; letter-spacing: -.01em; margin: 0 }
+header p, .hint { color: var(--muted); margin: .25rem 0 0 }
+.hint { font-size: .9em }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0 }
+fieldset:disabled { opacity: .55 }
+section { border-top: 1px solid var(--line); padding: .9rem 0 .2rem; margin-top: .9rem }
+h2 { font-size: .95rem; font-weight: 600; margin: 0 0 .6rem; color: var(--text) }
+
+/* The shutter disc: the amber sector is the open time, the notch at the top is the frame. */
+.dial { display: flex; align-items: center; gap: 1rem }
+.disc {
+    --start: -90deg; --open: 180deg;
+    flex: none; width: 84px; height: 84px; border-radius: 50%; position: relative;
+    background: conic-gradient(from var(--start), var(--amber) 0 var(--open), var(--raised) var(--open) 360deg);
+    box-shadow: inset 0 0 0 1px var(--line);
+}
+.disc::before { content: ""; position: absolute; inset: 30%; border-radius: 50%; background: var(--ground); box-shadow: 0 0 0 1px var(--line) }
+.disc::after { content: ""; position: absolute; left: calc(50% - 1px); top: -5px; width: 2px; height: 14px; background: var(--text); border-radius: 1px }
+#degrees { font-size: 2.1rem; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums }
+
+input[type=range] { width: 100%; margin: .7rem 0 .5rem; accent-color: var(--amber) }
+.row { display: flex; justify-content: space-between; align-items: baseline; margin-top: .4rem }
+.row-label { color: var(--muted) }
+.row output { font-variant-numeric: tabular-nums }
+
+button, select { font: inherit; color: var(--text); border-radius: 6px; border: 1px solid var(--line); background: var(--raised) }
+button { cursor: pointer; padding: .45rem .7rem }
+button:hover:not(:disabled) { border-color: var(--muted) }
+button:disabled { opacity: .5; cursor: default }
+:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px }
+select { width: 100%; padding: .45rem; margin: .3rem 0 .6rem }
+
+.presets { display: grid; grid-template-columns: repeat(5, 1fr); gap: .3rem; margin-bottom: .8rem }
+.presets button { padding: .3rem 0; font-variant-numeric: tabular-nums }
+.presets button[aria-pressed=true] { border-color: var(--amber); color: var(--amber) }
+
+.segmented { display: grid; grid-template-columns: auto repeat(3, 1fr); align-items: center; gap: .3rem; margin-bottom: .6rem }
+.segmented .row-label { padding-right: .4rem }
+.segmented label { position: relative }
+.segmented input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer }
+.segmented label span { display: block; text-align: center; padding: .3rem 0; border: 1px solid var(--line); border-radius: 6px; background: var(--raised) }
+.segmented input:checked + span { background: var(--amber-dim); border-color: var(--amber); color: #fff }
+.segmented input:focus-visible + span { outline: 2px solid var(--amber); outline-offset: 2px }
+
+figure { margin: 0 0 .6rem }
+#image { display: block; width: 100%; height: auto; border-radius: 4px; background: #000 }
+figcaption { color: var(--muted); font-size: .9em; margin: .3rem 0 0 }
+.pair { display: flex; gap: .4rem }
+.pair button { flex: 1 }
+#compare { user-select: none; touch-action: none }
+
+.output button, progress { width: 100%; box-sizing: border-box; margin: .3rem 0 }
+.primary { background: var(--amber); color: var(--amber-ink); border-color: var(--amber); font-weight: 600; padding: .6rem }
+.primary:hover:not(:disabled) { background: #f6bb5e; border-color: #f6bb5e }
+progress { accent-color: var(--amber); height: .5rem }
+#status { white-space: pre-wrap; overflow-wrap: anywhere; margin: .4rem 0 }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }
