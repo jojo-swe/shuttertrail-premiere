@@ -1,5 +1,7 @@
 # ShutterTrail for Premiere Pro
 
+<img src="./shuttertrail-avatar.png" alt="ShutterTrail" width="128" height="128">
+
 En lokal Windows-panel för att ge ett trimmat klipp rörelseoskärpa i Adobe Premiere Pro. Markera klippet, välj slutarvinkel och rendera. Panelen importerar en ljudlös MP4 till samma tidsintervall på spåret direkt ovanför. Du kan växla mellan bilderna genom att slå av och på det övre spåret.
 
 ## Kom igång på Windows 11 x64
