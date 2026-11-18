@@ -12,7 +12,7 @@ call "%PMB_VS%\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul
 if errorlevel 1 exit /b 1
 if not exist build mkdir build
 pushd build || exit /b 1
-set "PMB_FLAGS=/nologo /std:c++17 /O2 /EHsc /MD /utf-8 /W4 /D_WIN32_WINNT=0x0A00"
+set "PMB_FLAGS=/nologo /std:c++17 /O2 /EHsc /MT /utf-8 /W4 /D_WIN32_WINNT=0x0A00"
 set "PMB_LIBS=mfplat.lib mfreadwrite.lib mfuuid.lib ole32.lib uuid.lib"
 cl %PMB_FLAGS% ..\worker\RenderClip.cpp /Fe:MotionBlurWorker.exe /link %PMB_LIBS%
 if errorlevel 1 exit /b 1
