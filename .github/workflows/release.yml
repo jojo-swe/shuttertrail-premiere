@@ -24,9 +24,19 @@ jobs:
           $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
           git init .
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --depth=1 "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git" $env:GITHUB_SHA
+          $url = "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git"
+          # Build the commit the tag names when it exists, so a manual run for an
+          # existing tag cannot package the dispatch branch instead.
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --depth=1 $url "refs/tags/$($env:RELEASE_TAG):refs/tags/$($env:RELEASE_TAG)" 2>$null
+          if ($LASTEXITCODE -eq 0) {
+            git checkout --detach "refs/tags/$env:RELEASE_TAG^{commit}"
+          } else {
+            git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --depth=1 $url $env:GITHUB_SHA
+            if ($LASTEXITCODE) { exit $LASTEXITCODE }
+            git checkout --detach FETCH_HEAD
+          }
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
-          git checkout --detach FETCH_HEAD
+          "BUILD_SHA=$(git rev-parse HEAD)" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
       - name: Build worker and run Windows media tests
         shell: cmd
         run: call Build.cmd
@@ -54,17 +64,22 @@ jobs:
         run: |
           $repo = $env:GITHUB_REPOSITORY
           $files = @($env:PACKAGE, "$env:PACKAGE.sha256")
-          gh release view $env:RELEASE_TAG --repo $repo *> $null
+          $draft = gh release view $env:RELEASE_TAG --repo $repo --json isDraft --jq .isDraft 2>$null
           if ($LASTEXITCODE -eq 0) {
+            # Never replace assets on a release users can already download.
+            if ($draft -ne 'true') {
+              Write-Error "$env:RELEASE_TAG is already published. Use a new tag, for example the next -rc number."
+              exit 1
+            }
             gh release upload $env:RELEASE_TAG @files --clobber --repo $repo
           } else {
             $notes = @"
-          Release candidate built from $env:GITHUB_SHA.
+          Release candidate built from $env:BUILD_SHA.
 
           Unpack the zip, close Premiere Pro and run **Install.cmd**. No compiler is needed.
           The worker is unsigned and the panel uses CEP developer mode (PlayerDebugMode).
           Verify the SHA-256 checksum before installing.
           "@
-            gh release create $env:RELEASE_TAG @files --repo $repo --draft --prerelease --target $env:GITHUB_SHA --title "ShutterTrail $env:RELEASE_TAG" --notes $notes
+            gh release create $env:RELEASE_TAG @files --repo $repo --draft --prerelease --target $env:BUILD_SHA --title "ShutterTrail $env:RELEASE_TAG" --notes $notes
           }
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
