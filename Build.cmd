@@ -28,7 +28,7 @@ if errorlevel 1 (
     echo Test files are available at "%PMB_FIXTURE%"
     exit /b 1
 )
-del "%PMB_FIXTURE%\source.mp4" "%PMB_FIXTURE%\trim.mp4"
+del "%PMB_FIXTURE%\source.mp4" "%PMB_FIXTURE%\trim.mp4" "%PMB_FIXTURE%\index-source.mp4" "%PMB_FIXTURE%\index-trim.mp4" "%PMB_FIXTURE%\offset-source.mp4" "%PMB_FIXTURE%\offset-trim.mp4"
 rmdir "%PMB_FIXTURE%"
 popd
 popd

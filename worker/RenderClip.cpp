@@ -51,6 +51,18 @@ struct VideoFormat {
         // Split first to avoid overflow in long clips at fractional frame rates.
         return (frame/num)*den*hns + ((frame%num)*den*hns + num/2)/num;
     }
+    // Nearest frame for a 100-ns delta. Inverse of time() at this exact rate,
+    // including 30000/1001, so a timestamp lands on the frame that produced it.
+    i64 frameFor(i64 delta) const {
+        const bool neg=delta<0;
+        const unsigned long long magnitude=neg?static_cast<unsigned long long>(-delta)
+                                              :static_cast<unsigned long long>(delta);
+        const unsigned long long tick=static_cast<unsigned long long>(den)*static_cast<unsigned long long>(hns);
+        const unsigned long long n=num;
+        const unsigned long long frames=(magnitude/tick)*n+((magnitude%tick)*n+tick/2)/tick;
+        if (neg && frames!=0) return -static_cast<i64>(frames);
+        return static_cast<i64>(frames);
+    }
 };
 struct Reader : VideoFormat {
     ComPtr<IMFSourceReader> source;
@@ -155,7 +167,7 @@ struct Writer {
         check(sink->SetInputMediaType(stream,raw.Get(),nullptr),"Configure encoder");
         check(sink->BeginWriting(),"Start encoder");
     }
-    void write(const Frame& f,i64 index) {
+    void write(const Frame& f,i64 index,i64 origin=0) {
         const DWORD bytes=DWORD(f.pixels.size());
         ComPtr<IMFMediaBuffer> buf; ComPtr<IMFSample> sample;
         check(MFCreateMemoryBuffer(bytes,&buf),"Create encoder buffer");
@@ -166,32 +178,49 @@ struct Writer {
         check(buf->SetCurrentLength(bytes),"Set buffer length");
         check(MFCreateSample(&sample),"Create sample");
         check(sample->AddBuffer(buf.Get()),"Attach encoder buffer");
-        check(sample->SetSampleTime(input.time(index)),"Set sample timestamp");
+        check(sample->SetSampleTime(origin+input.time(index)),"Set sample timestamp");
         check(sample->SetSampleDuration(input.time(index+1)-input.time(index)),"Set sample duration");
         check(sink->WriteSample(stream,sample.Get()),"Encode video frame");
     }
 };
 static void render(wchar_t** args) {
+    // The panel reserves a private directory per job. Also refuse to
+    // overwrite a file if someone invokes this executable directly.
+    need(GetFileAttributesW(args[2])==INVALID_FILE_ATTRIBUTES,"Output already exists");
     i64 start=integer(args[3],0,100000000), count=integer(args[4],1,100000000);
     i64 ticksPerFrame=integer(args[5],1000000,adobeTicks);
     int angle=int(integer(args[6],0,360)), samples=int(integer(args[7],1,32));
     Reader reader(args[1],ticksPerFrame);
     i64 pts=0;
     auto first=reader.read(pts);
-    need(std::llabs(pts)<=10000,"Nonzero media start timestamp is unsupported");
+    // The first presentation is frame 0 even when its timestamp is not zero
+    // (edit lists and encoder delay). Later frames are measured from it.
     const i64 origin=pts;
-    const i64 tolerance=std::min(10000LL,reader.time(1)/10);
+    auto frameAt=[&](i64 timestamp){return reader.frameFor(timestamp-origin);};
     if (start>0) {
         // Seek slightly before the selection. Decoders may return a keyframe
-        // earlier than requested; locate the exact timestamp before encoding.
-        PROPVARIANT pos={};
-        pos.vt=VT_I8; pos.hVal.QuadPart=std::max(0LL,origin+reader.time(start)-hns);
-        check(reader.source->SetCurrentPosition(GUID_NULL,pos),"Seek to trim");
-        do { first=reader.read(pts); } while (pts<origin+reader.time(start)-tolerance);
+        // earlier than requested; choose the frame by rounding, not a tolerance.
+        const i64 target=origin+reader.time(start);
+        i64 seekPos=target-hns;
+        if (seekPos<origin) seekPos=origin;
+        auto seekTo=[&](i64 position){
+            PROPVARIANT pos={};
+            pos.vt=VT_I8; pos.hVal.QuadPart=position;
+            check(reader.source->SetCurrentPosition(GUID_NULL,pos),"Seek to trim");
+            first=reader.read(pts);
+        };
+        seekTo(seekPos);
+        if (frameAt(pts)>start) seekTo(origin<0?origin:0);
+        while (frameAt(pts)<start) first=reader.read(pts);
     }
-    auto validate=[&](i64 index) {
-        need(std::llabs(pts-origin-reader.time(start+index))<=tolerance,
-             "Frame timestamp mismatch. Use constant-frame-rate media without gaps");
+    auto validate=[&](i64 index){
+        const i64 got=frameAt(pts);
+        if (got==start+index) return;
+        char s[256];
+        std::snprintf(s,sizeof(s),
+            "Frame timestamp mismatch at frame %lld (got %lld, pts %lld, origin %lld). Use constant-frame-rate media without gaps",
+            start+index,got,pts,origin);
+        need(false,s);
     };
     validate(0);
     Frame current=reader.unpack(first.Get()), previous=current;
@@ -215,9 +244,6 @@ int wmain(int argc,wchar_t** argv) {
     if (argc!=8) { std::fputs("Usage: MotionBlurWorker input output.mp4 startFrame frameCount ticksPerFrame angle samples\n",stderr); return 2; }
     bool com=false,mf=false; int status=0;
     try {
-        // The panel reserves a private directory per job. Also refuse to
-        // overwrite a file if someone invokes this executable directly.
-        need(GetFileAttributesW(argv[2])==INVALID_FILE_ATTRIBUTES,"Output already exists");
         check(CoInitializeEx(nullptr,COINIT_MULTITHREADED),"Initialize COM"); com=true;
         check(MFStartup(MF_VERSION),"Start Media Foundation"); mf=true;
         render(argv);
