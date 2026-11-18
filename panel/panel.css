@@ -1,0 +1,7 @@
+:root { color-scheme:dark; font:14px/1.5 "Segoe UI",sans-serif; background:#202125; color:#f0f1f4 }
+body { margin:0 } main { max-width:36rem; padding:1.2rem; margin:auto } h1 { font-size:1.4rem; margin:0 }
+p { color:#c8cad2 } .label { display:flex; justify-content:space-between } output { color:#a9c9ff }
+input,select,button,progress { width:100%; box-sizing:border-box; margin:.35rem 0 .9rem; accent-color:#93baff }
+select,button { padding:.5rem; border-radius:5px; font:inherit; border:1px solid #626671 }
+button { background:#a7c7ff; color:#101c32; font-weight:600; cursor:pointer } button:disabled { opacity:.5 }
+#cancel { background:transparent; color:#ddd } #status { white-space:pre-wrap; overflow-wrap:anywhere; margin:.3rem 0 }

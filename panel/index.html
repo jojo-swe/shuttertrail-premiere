@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="sv"><head><meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<title>Motion Blur</title><link rel="stylesheet" href="panel.css"></head>
+<body><main>
+<h1>Motion Blur</h1>
+<p>Markera ett H.264-klipp med samma bildfrekvens som sekvensen. Bilden hämtas från källfilen före effekter och transformering.</p>
+<div class="label"><label for="angle">Slutarvinkel</label><output id="degrees" for="angle">180°</output></div>
+<input type="range" id="angle" min="0" max="360" step="5" value="180">
+<label for="samples">Exponeringsprover per bildruta</label>
+<select id="samples"><option>4</option><option selected>8</option><option>16</option></select>
+<button id="render">Rendera till spåret ovanför</button>
+<button id="cancel" hidden>Avbryt rendering</button>
+<progress id="progress" hidden></progress><p id="status" role="status" aria-live="polite">Redo.</p>
+</main><script src="panel.js"></script></body></html>
