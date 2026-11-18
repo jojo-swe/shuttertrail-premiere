@@ -13,7 +13,7 @@ if errorlevel 1 goto failed
 set "PMB_WORKER=build\MotionBlurWorker.exe"
 :install
 if not exist "%PMB_WORKER%" goto failed
-set "PMB_DEST=%APPDATA%\Adobe\CEP\extensions\se.jojoswe.motionblur"
+set "PMB_DEST=%APPDATA%\Adobe\CEP\extensions\com.shuttertrail.premiere"
 if not exist "%PMB_DEST%\bin" mkdir "%PMB_DEST%\bin"
 xcopy "panel\*" "%PMB_DEST%\" /E /I /Y /Q >nul
 if errorlevel 1 goto failed
