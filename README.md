@@ -46,6 +46,9 @@ MIT covers the material in this repository. Adobe and Microsoft provide host app
 
 ## Development and verification
 
+Contributor and agent notes are in [AGENTS.md](AGENTS.md); the current state and open work are in [HANDOVER.md](HANDOVER.md).
+
+
 - **Build.cmd** only builds inside `build/` and runs the Windows tests. It does not install any panel. The worker and test programs are linked with `/MT`. The Windows test creates a 60-frame H.264 video at 30000/1001 fps, renders nine frames starting at source frame 37, decodes the result and checks image content, timestamps and frame count. It repeats this for trims that start at the first frame and end at the last frame, where no handle frame exists, and checks that preview mode writes images of the right frame.
 - **Install.cmd** copies the panel to the CEP folder and `MotionBlurWorker.exe` to the panel's `bin\`. A prebuilt worker in `build\` is used if present, otherwise `bin\MotionBlurWorker.exe` if present. If neither exists, **Build.cmd** runs first.
 - **tests/MotionBlurTest.cpp** tests a static image, known motion, motion beyond the fine search window, motion between whole pixels, the forward-backward check around an occluding object, that the streaming renderer matches single-frame rendering, two exposure lengths, 0°, neutral chroma, a cut boundary, a single frame and that the multithreaded result matches a single-threaded run. On Linux/macOS it can be run with `c++ -std=c++17 -O2 -pthread tests/MotionBlurTest.cpp -o /tmp/motion-test && /tmp/motion-test`.
