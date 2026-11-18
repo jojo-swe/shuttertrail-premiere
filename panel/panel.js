@@ -7,7 +7,22 @@
     const worker = path.join(path.dirname(fileURLToPath(location.href)), 'bin', 'MotionBlurWorker.exe');
     const el = id => document.getElementById(id);
     let child = null, cancelled = false;
+    // Remember the last shutter angle and sample count. Storage can be
+    // unavailable, so every access is optional.
+    const saved = key => { try { return localStorage.getItem('shuttertrail.'+key); } catch (_) { return null; } };
+    const save = (key,value) => { try { localStorage.setItem('shuttertrail.'+key,value); } catch (_) {} };
+    for (const id of ['angle','samples']) {
+        const input = el(id), value = saved(id);
+        // Restore only a value the control can show.
+        const valid = input.options
+            ? [...input.options].some(o => o.value === value)
+            : value !== null && /^\d+$/.test(value) && +value >= +input.min && +value <= +input.max
+              && +value % +input.step === 0;
+        if (valid) input.value = value;
+        input.addEventListener('change', () => save(id, input.value));
+    }
     el('angle').oninput = () => { el('degrees').textContent = el('angle').value + '°'; };
+    el('angle').oninput();
     function host(script) {
         return new Promise((resolve,reject) => window.__adobe_cep__.evalScript(script, result => {
             try {
@@ -20,7 +35,7 @@
     function run(args) {
         return new Promise((resolve,reject) => {
             child = spawn(worker,args,{windowsHide:true,shell:false});
-            let tail='', line='';
+            let tail='', line='', started=null;
             child.stderr.on('data',data => { tail=(tail+data.toString()).slice(-4096); });
             child.stdout.on('data',data => {
                 const lines=(line+data.toString()).split('\n');
@@ -28,8 +43,18 @@
                 for (const msg of lines) {
                     const m=/^(\d+)\/(\d+)\s*$/.exec(msg);
                     if (m) {
-                        el('progress').value = Number(m[1])/Number(m[2]);
-                        el('status').textContent = 'Rendering frame '+m[1]+' of '+m[2]+'.';
+                        const done=Number(m[1]), total=Number(m[2]);
+                        el('progress').value = done/total;
+                        let text = 'Rendering frame '+done+' of '+total+'.';
+                        // Estimate from the frames since the first report, which
+                        // excludes opening the file and seeking.
+                        if (!started) started = {time: Date.now(), done};
+                        else if (done > started.done) {
+                            const left = (Date.now()-started.time)/(done-started.done)*(total-done)/1000;
+                            text += left < 60 ? ' About '+Math.max(1,Math.round(left))+' s left.'
+                                              : ' About '+Math.round(left/60)+' min left.';
+                        }
+                        el('status').textContent = text;
                     }
                 }
             });
