@@ -17,6 +17,8 @@
 #include <utility>
 #include <string>
 #include "MotionBlur.hpp"
+#include "Preview.hpp"
+#include <optional>
 
 using Microsoft::WRL::ComPtr;
 using motion::Frame;
@@ -102,6 +104,12 @@ struct Reader : VideoFormat {
              "Unsupported frame dimensions");
     }
     ComPtr<IMFSample> read(i64& timestamp) {
+        auto sample=tryRead(timestamp);
+        need(sample!=nullptr,"Source ended before the selected out point");
+        return sample;
+    }
+    // Returns null at the end of the stream.
+    ComPtr<IMFSample> tryRead(i64& timestamp) {
         for (;;) {
             DWORD flags=0; ComPtr<IMFSample> sample;
             check(source->ReadSample(video,0,nullptr,&flags,&timestamp,&sample),"Decode frame");
@@ -118,7 +126,7 @@ struct Reader : VideoFormat {
                 need(!MFGetAttributeUINT32(sample.Get(),MFSampleExtension_Interlaced,0),"Interlaced sample");
                 return sample;
             }
-            need(!(flags&MF_SOURCE_READERF_ENDOFSTREAM),"Source ended before the selected out point");
+            if (flags&MF_SOURCE_READERF_ENDOFSTREAM) return nullptr;
         }
     }
     Frame unpack(IMFSample* sample) const {
@@ -183,24 +191,27 @@ struct Writer {
         check(sink->WriteSample(stream,sample.Get()),"Encode video frame");
     }
 };
-static void render(wchar_t** args) {
-    // The panel reserves a private directory per job. Also refuse to
-    // overwrite a file if someone invokes this executable directly.
-    need(GetFileAttributesW(args[2])==INVALID_FILE_ATTRIBUTES,"Output already exists");
-    i64 start=integer(args[3],0,100000000), count=integer(args[4],1,100000000);
-    i64 ticksPerFrame=integer(args[5],1000000,adobeTicks);
-    int angle=int(integer(args[6],0,360)), samples=int(integer(args[7],1,32));
-    Reader reader(args[1],ticksPerFrame);
+// Decodes source frames start..start+count-1, plus a handle frame on each side
+// when the source has one, and hands each frame and its blurred version to
+// sink(reader, original, blurred, index). Full renders and previews share it.
+template <class Sink>
+static void process(const wchar_t* file, i64 start, i64 count, i64 ticksPerFrame,
+                    int angle, int samples, Sink&& sink) {
+    Reader reader(file,ticksPerFrame);
     i64 pts=0;
     auto first=reader.read(pts);
     // The first presentation is frame 0 even when its timestamp is not zero
     // (edit lists and encoder delay). Later frames are measured from it.
     const i64 origin=pts;
     auto frameAt=[&](i64 timestamp){return reader.frameFor(timestamp-origin);};
-    if (start>0) {
+    // One frame on each side of the trim, when the source has it, gives the
+    // first and last frames the same blur as the rest instead of half of it.
+    const bool before=start>0;
+    const i64 begin=before?start-1:start;
+    if (begin>0) {
         // Seek slightly before the selection. Decoders may return a keyframe
         // earlier than requested; choose the frame by rounding, not a tolerance.
-        const i64 target=origin+reader.time(start);
+        const i64 target=origin+reader.time(begin);
         i64 seekPos=target-hns;
         if (seekPos<origin) seekPos=origin;
         auto seekTo=[&](i64 position){
@@ -210,43 +221,98 @@ static void render(wchar_t** args) {
             first=reader.read(pts);
         };
         seekTo(seekPos);
-        if (frameAt(pts)>start) seekTo(origin<0?origin:0);
-        while (frameAt(pts)<start) first=reader.read(pts);
+        if (frameAt(pts)>begin) seekTo(origin<0?origin:0);
+        while (frameAt(pts)<begin) first=reader.read(pts);
     }
-    auto validate=[&](i64 index){
+    auto validate=[&](i64 expected){
         const i64 got=frameAt(pts);
-        if (got==start+index) return;
+        if (got==expected) return;
         char s[256];
         std::snprintf(s,sizeof(s),
             "Frame timestamp mismatch at frame %lld (got %lld, pts %lld, origin %lld). Use constant-frame-rate media without gaps",
-            start+index,got,pts,origin);
+            expected,got,pts,origin);
         need(false,s);
     };
-    validate(0);
-    Frame current=reader.unpack(first.Get()), previous=current;
-    first.Reset();
-    Writer writer(args[2],reader);
-    for (i64 i=0; i<count; ++i) {
-        Frame next=current;
-        if (i+1<count) {
-            auto s=reader.read(pts); validate(i+1); next=reader.unpack(s.Get());
-        }
-        // Clamp at both trim boundaries, even when more source footage exists.
-        writer.write(motion::expose(i?previous:current,current,i+1<count?next:current,samples,angle),i);
-        previous=std::move(current); current=std::move(next);
-        if (i%5==0 || i+1==count) { std::printf("%lld/%lld\n",i+1,count); std::fflush(stdout); }
+    validate(begin);
+    Frame previous=reader.unpack(first.Get());
+    if (before) {
+        first=reader.read(pts);
+        validate(start);
     }
-    check(writer.sink->Finalize(),"Finalize MP4");
+    Frame current=before?reader.unpack(first.Get()):previous;
+    first.Reset();
+    motion::Exposer exposer(samples,angle);
+    for (i64 i=0; i<count; ++i) {
+        Frame next(0,0);
+        bool hasNext=false;
+        if (i+1<count) {
+            auto s=reader.read(pts); validate(start+i+1); next=reader.unpack(s.Get()); hasNext=true;
+        } else if (auto s=reader.tryRead(pts); s && frameAt(pts)==start+count) {
+            next=reader.unpack(s.Get()); hasNext=true;
+        }
+        // Without a handle, pass the current frame itself to clamp at that edge.
+        const Frame& p=(i>0 || before)?previous:current;
+        const Frame& n=hasNext?next:current;
+        sink(static_cast<const Reader&>(reader),current,exposer(p,current,n),i);
+        previous=std::move(current); current=std::move(next);
+    }
+}
+
+static void render(wchar_t** args) {
+    // The panel reserves a private directory per job. Also refuse to
+    // overwrite a file if someone invokes this executable directly.
+    need(GetFileAttributesW(args[2])==INVALID_FILE_ATTRIBUTES,"Output already exists");
+    const i64 start=integer(args[3],0,100000000), count=integer(args[4],1,100000000);
+    const i64 ticksPerFrame=integer(args[5],1000000,adobeTicks);
+    const int angle=int(integer(args[6],0,360)), samples=int(integer(args[7],1,32));
+    std::optional<Writer> writer;
+    process(args[1],start,count,ticksPerFrame,angle,samples,
+            [&](const Reader& reader, const Frame&, const Frame& blurred, i64 i) {
+        if (!writer) writer.emplace(args[2],reader);
+        writer->write(blurred,i);
+        if (i+1==count) check(writer->sink->Finalize(),"Finalize MP4");
+        if (i%5==0 || i+1==count) { std::printf("%lld/%lld\n",i+1,count); std::fflush(stdout); }
+    });
+}
+
+// The colour standard the decoder reports, or the usual one for the size.
+static preview::Colour colourOf(const Reader& reader) {
+    preview::Colour colour;
+    const auto matrix=MFGetAttributeUINT32(reader.native.Get(),MF_MT_YUV_MATRIX,MFVideoTransferMatrix_Unknown);
+    colour.bt709=matrix==MFVideoTransferMatrix_BT709 || (matrix!=MFVideoTransferMatrix_BT601 && reader.height>=720);
+    colour.fullRange=MFGetAttributeUINT32(reader.native.Get(),MF_MT_VIDEO_NOMINAL_RANGE,MFNominalRange_Unknown)==MFNominalRange_0_255;
+    return colour;
+}
+
+// --preview input outputBase frame ticksPerFrame angle samples
+// Writes outputBase.bmp (blurred) and outputBase-original.bmp for one frame.
+static void renderPreview(wchar_t** args) {
+    const std::wstring base(args[2]), blurredFile=base+L".bmp", originalFile=base+L"-original.bmp";
+    for (const auto& f : {blurredFile,originalFile})
+        need(GetFileAttributesW(f.c_str())==INVALID_FILE_ATTRIBUTES,"Output already exists");
+    const i64 frame=integer(args[3],0,100000000), ticksPerFrame=integer(args[4],1000000,adobeTicks);
+    const int angle=int(integer(args[5],0,360)), samples=int(integer(args[6],1,32));
+    process(args[1],frame,1,ticksPerFrame,angle,samples,
+            [&](const Reader& reader, const Frame& original, const Frame& blurred, i64) {
+        const auto colour=colourOf(reader);
+        need(preview::writeFile(blurredFile,preview::toBmp(blurred,colour)),"Could not write the preview image");
+        need(preview::writeFile(originalFile,preview::toBmp(original,colour)),"Could not write the preview image");
+    });
 }
 
 #ifndef MOTION_BLUR_TEST_DRIVER
 int wmain(int argc,wchar_t** argv) {
-    if (argc!=8) { std::fputs("Usage: MotionBlurWorker input output.mp4 startFrame frameCount ticksPerFrame angle samples\n",stderr); return 2; }
+    const bool previewMode=argc==8 && std::wcscmp(argv[1],L"--preview")==0;
+    if (argc!=8) {
+        std::fputs("Usage: MotionBlurWorker input output.mp4 startFrame frameCount ticksPerFrame angle samples\n"
+                   "       MotionBlurWorker --preview input outputBase frame ticksPerFrame angle samples\n",stderr);
+        return 2;
+    }
     bool com=false,mf=false; int status=0;
     try {
         check(CoInitializeEx(nullptr,COINIT_MULTITHREADED),"Initialize COM"); com=true;
         check(MFStartup(MF_VERSION),"Start Media Foundation"); mf=true;
-        render(argv);
+        if (previewMode) renderPreview(argv+1); else render(argv);
     } catch (const std::exception& e) { std::fprintf(stderr,"%s\n",e.what()); status=1; }
     if (mf) MFShutdown();
     if (com) CoUninitialize();

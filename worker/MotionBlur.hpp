@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <initializer_list>
+#include <optional>
 #include <thread>
 #include <vector>
 
@@ -153,8 +154,20 @@ struct Field {
                         if (sbest <= best) { bx = sx; by = sy; best = sbest; }
                     }
                     g.dx[row*g.cols+col] = bx; g.dy[row*g.cols+col] = by;
-                    if (k == 0)
-                        vectors[row*cols+col] = {float(bx),float(by),std::clamp(1.f-best/(36.f*28.f),0.f,1.f)};
+                    if (k == 0) {
+                        // A parabola through the matching error on each side of the
+                        // best whole-pixel vector places it between pixels, so slow
+                        // motion blurs by its real length instead of a rounded one.
+                        auto sad = [&](int dx, int dy) { return float(score(dx,dy) - std::abs(dx) - std::abs(dy)); };
+                        auto vertex = [](float minus, float centre, float plus) {
+                            const float curve = minus - 2*centre + plus;
+                            return curve > 0 ? std::clamp(0.5f*(minus-plus)/curve, -0.5f, 0.5f) : 0.f;
+                        };
+                        const float c = sad(bx,by);
+                        const float fx = vertex(sad(bx-1,by), c, sad(bx+1,by));
+                        const float fy = vertex(sad(bx,by-1), c, sad(bx,by+1));
+                        vectors[row*cols+col] = {bx+fx, by+fy, std::clamp(1.f-best/(36.f*28.f),0.f,1.f)};
+                    }
                 }
             });
         }
@@ -187,10 +200,25 @@ inline float sample(const Frame& f, bool uv, int lane, float x, float y) {
            dy*((1-dx)*read(ix,jy)+dx*read(jx,jy));
 }
 
-inline Frame expose(const Frame& prev, const Frame& cur, const Frame& next, int samples, int angle) {
+// Forward-backward consistency. A vector from A to B should land on a vector
+// from B back to A that points the opposite way. Occlusions and false matches
+// on repeating patterns break that, and blending along them draws double
+// edges, so the confidence of inconsistent tiles falls to zero.
+inline void crossCheck(Field& field, const Field& reverse) {
+    for (int row=0; row<field.rows; ++row) for (int col=0; col<field.cols; ++col) {
+        Vector& v=field.vectors[row*field.cols+col];
+        if (v.confidence<=0) continue;
+        const float cx=float(col*tile+tile/2), cy=float(row*tile+tile/2);
+        const Vector r=reverse.at(cx+v.x,cy+v.y);
+        const float error=std::hypot(v.x+r.x,v.y+r.y);
+        const float tolerance=1.5f+0.1f*std::hypot(v.x,v.y);
+        v.confidence*=std::clamp(1.f-(error-tolerance)/3.f,0.f,1.f);
+    }
+}
+
+inline Frame blend(const Frame& prev, const Frame& cur, const Frame& next,
+                   const Field& backward, const Field& forward, int samples, int angle) {
     Frame out=cur;
-    if (angle==0) return out;
-    Field backward(cur,prev), forward(cur,next);
     for (int plane=0; plane<2; ++plane) {
         bool uv=plane==1;
         int scale=uv?2:1, offset=uv?cur.width*cur.height:0;
@@ -218,5 +246,29 @@ inline Frame expose(const Frame& prev, const Frame& cur, const Frame& next, int 
         });
     }
     return out;
+}
+
+// Renders consecutive frames. Every field is computed once and used twice:
+// as the motion of one frame and as the consistency check of its neighbour.
+// Each call's cur and next must be the next call's prev and cur. Pass the
+// same object as prev (or next) to clamp at the start (or end) of the footage.
+class Exposer {
+    int samples, angle;
+    std::optional<Field> backward, reverseBackward;
+public:
+    Exposer(int samplesPerFrame, int shutterAngle) : samples(samplesPerFrame), angle(shutterAngle) {}
+    Frame operator()(const Frame& prev, const Frame& cur, const Frame& next) {
+        if (angle==0) return cur;
+        Field b=backward ? std::move(*backward) : Field(cur,prev);
+        Field rb=reverseBackward ? std::move(*reverseBackward) : Field(prev,cur);
+        Field f(cur,next), rf(next,cur);
+        backward=rf; reverseBackward=f;
+        crossCheck(b,rb); crossCheck(f,rf);
+        return blend(prev,cur,next,b,f,samples,angle);
+    }
+};
+
+inline Frame expose(const Frame& prev, const Frame& cur, const Frame& next, int samples, int angle) {
+    return Exposer(samples,angle)(prev,cur,next);
 }
 }

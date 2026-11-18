@@ -19,6 +19,9 @@ if errorlevel 1 exit /b 1
 cl %PMB_FLAGS% ..\tests\MotionBlurTest.cpp /Fe:MotionBlurTest.exe
 if errorlevel 1 exit /b 1
 MotionBlurTest.exe || exit /b 1
+cl %PMB_FLAGS% ..\tests\PreviewTest.cpp /Fe:PreviewTest.exe
+if errorlevel 1 exit /b 1
+PreviewTest.exe || exit /b 1
 cl %PMB_FLAGS% ..\tests\MediaFoundationTest.cpp /Fe:MediaFoundationTest.exe /link %PMB_LIBS%
 if errorlevel 1 exit /b 1
 set "PMB_FIXTURE=%TEMP%\motion-blur-%RANDOM%-%RANDOM%"
@@ -28,7 +31,7 @@ if errorlevel 1 (
     echo Test files are available at "%PMB_FIXTURE%"
     exit /b 1
 )
-del "%PMB_FIXTURE%\source.mp4" "%PMB_FIXTURE%\trim.mp4" "%PMB_FIXTURE%\index-source.mp4" "%PMB_FIXTURE%\index-trim.mp4"
+del /q "%PMB_FIXTURE%\*.mp4"
 rmdir "%PMB_FIXTURE%"
 popd
 popd

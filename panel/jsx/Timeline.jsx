@@ -14,9 +14,10 @@ var MotionBlurTimeline = (function () {
         }
         return false;
     }
-    function capture() {
+    // The selected clip and its source trim. Shared by rendering and preview.
+    function selection() {
         var project=app.project, seq=project.activeSequence;
-        if (!seq || !project.path) fail("Open a sequence and save the project first.");
+        if (!seq) fail("Open a sequence first.");
         var clip=null, index=-1;
         for (var t=0; t<seq.videoTracks.numTracks; ++t) {
             var items=seq.videoTracks[t].clips;
@@ -31,14 +32,6 @@ var MotionBlurTimeline = (function () {
             fail("Choose a local video clip whose original media is available.");
         if (clip.getSpeed()!==1 || clip.isSpeedReversed() || clip.disabled)
             fail("The clip must be enabled and play forward at 100 %.");
-        if (index+1>=seq.videoTracks.numTracks) fail("Create a video track directly above the clip.");
-        var target=seq.videoTracks[index+1];
-        if ((target.isLocked && target.isLocked()) || target.isMuted())
-            fail("Unlock and enable the track above.");
-        if (overlaps(target.clips,clip) || overlaps(target.transitions,clip))
-            fail("The range on the video track above is occupied.");
-        if (overlaps(seq.videoTracks[index].transitions,clip))
-            fail("The clip has a transition. Render a standalone clip first.");
         var step=Number(seq.timebase);
         function frame(time) {
             var n=Number(time.ticks)/step, rounded=Math.round(n);
@@ -51,11 +44,36 @@ var MotionBlurTimeline = (function () {
         var info=item.getFootageInterpretation();
         if (info && info.frameRate>0 && Math.abs(info.frameRate-254016000000/step)>0.002)
             fail("The clip and the sequence must have the same frame rate.");
+        return {project:project, seq:seq, clip:clip, index:index, item:item, step:step, start:start, count:count};
+    }
+    function capture() {
+        var s=selection(), project=s.project, seq=s.seq, clip=s.clip, index=s.index, item=s.item;
+        var step=s.step, start=s.start, count=s.count;
+        if (!project.path) fail("Save the project first.");
+        if (index+1>=seq.videoTracks.numTracks) fail("Create a video track directly above the clip.");
+        var target=seq.videoTracks[index+1];
+        if ((target.isLocked && target.isLocked()) || target.isMuted())
+            fail("Unlock and enable the track above.");
+        if (overlaps(target.clips,clip) || overlaps(target.transitions,clip))
+            fail("The range on the video track above is occupied.");
+        if (overlaps(seq.videoTracks[index].transitions,clip))
+            fail("The clip has a transition. Render a standalone clip first.");
         var state=reply(["OK",item.getMediaPath(),project.path,start,count,step,index+2,
                          seq.sequenceID,clip.nodeId,item.nodeId,clip.start.ticks,clip.end.ticks,target.id]);
         return {state:state, project:project, clip:clip, target:target};
     }
     return {
+        // The source frame under the playhead in the selected clip. Outside the
+        // clip, the nearest clip frame is used and the last field is 0.
+        preview:function () {
+            try {
+                var s=selection(), position=s.seq.getPlayerPosition();
+                var at=Math.floor((Number(position.ticks)-Number(s.clip.start.ticks))/s.step+0.00001);
+                var inside=at>=0 && at<s.count;
+                at=Math.max(0,Math.min(s.count-1,at));
+                return reply(["OK",s.item.getMediaPath(),s.start+at,s.step,at,s.count,inside?1:0]);
+            } catch (e) { return reply(["ERR",e.message]); }
+        },
         inspect:function () {
             try { return capture().state; } catch (e) { return reply(["ERR",e.message]); }
         },

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'; img-src data:">
 <title>Motion Blur</title><link rel="stylesheet" href="panel.css"></head>
 <body><main>
 <h1>Motion Blur</h1>
@@ -9,7 +9,11 @@
 <input type="range" id="angle" min="0" max="360" step="5" value="180">
 <label for="samples">Exposure samples per frame</label>
 <select id="samples"><option>4</option><option selected>8</option><option>16</option></select>
+<button id="preview" class="secondary">Preview at playhead</button>
+<figure id="figure" hidden><img id="image" alt="Preview of the frame under the playhead">
+<figcaption id="caption"></figcaption>
+<button id="compare" class="secondary">Hold to compare with the original</button></figure>
 <button id="render">Render to track above</button>
-<button id="cancel" hidden>Cancel render</button>
+<button id="cancel" hidden>Cancel</button>
 <progress id="progress" hidden></progress><p id="status" role="status" aria-live="polite">Ready.</p>
 </main><script src="panel.js"></script></body></html>

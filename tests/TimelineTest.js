@@ -20,7 +20,8 @@ target.overwriteClip=(p,t)=>{
 };
 const tracks=[{clips:list([clip]),transitions:list([])},target];
 tracks.numTracks=2;
-const seq={sequenceID:'seq',timebase:String(step),videoTracks:tracks};
+let playhead=time(77);
+const seq={sequenceID:'seq',timebase:String(step),videoTracks:tracks,getPlayerPosition:()=>playhead};
 const project={path:'C:\\edit.prproj',activeSequence:seq,getInsertionBin:()=>({
     findItemsMatchingMediaPath:(file)=>file===output?[imported]:[]}),importFiles:()=>true};
 const host=vm.createContext({app:{project}});
@@ -40,4 +41,17 @@ seq.sequenceID='changed'; assert(api.place(snapshot,encodeURIComponent(output)).
 seq.sequenceID='seq'; assert.strictEqual(placed,0);
 assert.strictEqual(api.place(snapshot,encodeURIComponent(output)),'OK');
 assert.strictEqual(placed,1);
+// Preview: the playhead two frames into the clip maps to source frame 16.
+target.clips=list([]);
+const fields=r=>r.split('|').map(decodeURIComponent);
+assert.deepStrictEqual(fields(api.preview()),['OK',file,'16',String(step),'2','5','1']);
+// Outside the clip the nearest clip frame is used and flagged.
+playhead=time(90); assert.deepStrictEqual(fields(api.preview()).slice(2),['18',String(step),'4','5','0']);
+playhead=time(10); assert.deepStrictEqual(fields(api.preview()).slice(2),['14',String(step),'0','5','0']);
+// Preview needs neither a saved project nor a free track above.
+const savedPath=project.path; project.path='';
+target.clips=list([{start:time(70),end:time(90),isSelected:()=>false}]);
+assert(fields(api.preview())[0]==='OK');
+assert(api.inspect().startsWith('ERR|'));
+project.path=savedPath; target.clips=list([]);
 console.log('Timeline tests passed');
