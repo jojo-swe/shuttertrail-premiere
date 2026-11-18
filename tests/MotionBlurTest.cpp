@@ -6,8 +6,8 @@ using namespace motion;
 
 // A high-contrast textured plane moving horizontally by four pixels/frame.
 // Its stationary counterpart must survive both integer and subpixel sampling.
-Frame texture(int offset) {
-    Frame f(96,64);
+Frame texture(int offset, int width=96, int height=64) {
+    Frame f(width,height);
     for (int y=0;y<f.height;++y) for (int x=0;x<f.width;++x) {
         int xx=x-offset+128;
         unsigned seed=unsigned(xx)*2654435761u ^ unsigned(y)*2246822519u;
@@ -42,5 +42,20 @@ int main() {
                        [](Byte b){ return b==128; }));
     // Clamp the closing frame of a one-frame selection at both edges.
     assert(expose(current,current,current,16,360).pixels==current.pixels);
+    // Fast motion beyond the 15-pixel fine search window is found through the
+    // half-resolution level, and the result does not depend on the thread count.
+    auto fastPrev=texture(-24,256,192), fastCur=texture(0,256,192), fastNext=texture(24,256,192);
+    auto fast=Field(fastCur,fastNext).at(128,96);
+    assert(std::abs(fast.x-24)<0.1 && std::abs(fast.y)<0.1 && fast.confidence>0.5);
+    auto back=Field(fastCur,fastPrev).at(128,96);
+    assert(std::abs(back.x+24)<0.1 && std::abs(back.y)<0.1);
+    auto threaded=expose(fastPrev,fastCur,fastNext,8,360);
+    threadLimit()=1;
+    auto serial=expose(fastPrev,fastCur,fastNext,8,360);
+    threadLimit()=0;
+    assert(threaded.pixels==serial.pixels);
+    long change=0;
+    for (int y=48;y<144;++y) for (int x=64;x<192;++x) change+=std::abs(pixel(threaded,x,y)-pixel(fastCur,x,y));
+    assert(change>96L*128*10);
     std::cout<<"Motion tests passed\n";
 }
