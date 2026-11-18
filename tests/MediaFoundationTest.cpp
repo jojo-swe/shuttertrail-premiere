@@ -224,6 +224,29 @@ int wmain(int argc,wchar_t** argv) {
         runAt(source,tailBlur,L"57",L"3",angle180);
         checkOutput(tailBlur.c_str(),ticks,57,3,false);
 
+        // Preview mode writes the blurred and the original frame as BMP files.
+        // Frame 37 = 100101b: index block 0 is bright, block 1 is dark.
+        const auto previewBase=(dir/L"preview").wstring();
+        {
+            std::wstring frameText(L"37");
+            wchar_t* args[]={nullptr,const_cast<wchar_t*>(indexed.c_str()),const_cast<wchar_t*>(previewBase.c_str()),
+                             frameText.data(),const_cast<wchar_t*>(ticksText.c_str()),angle180,samples};
+            renderPreview(args);
+        }
+        for (const wchar_t* suffix : {L".bmp",L"-original.bmp"}) {
+            const auto path=std::filesystem::path(previewBase+suffix);
+            need(std::filesystem::exists(path),"Preview image missing");
+            std::vector<unsigned char> bmp(std::filesystem::file_size(path));
+            FILE* f=nullptr;
+            need(_wfopen_s(&f,path.c_str(),L"rb")==0 && f,"Open preview image");
+            const size_t got=std::fread(bmp.data(),1,bmp.size(),f);
+            std::fclose(f);
+            need(got==bmp.size() && bmp.size()==54+160*3*96 && bmp[0]=='B' && bmp[1]=='M',"Unexpected preview image layout");
+            auto grey=[&](int x,int y){ return int(bmp[54+(95-y)*160*3+x*3+1]); };
+            if (std::wstring(suffix)==L"-original.bmp")
+                need(std::abs(grey(8,8)-224)<=6 && std::abs(grey(24,8)-19)<=6,"Preview shows the wrong source frame");
+        }
+
         std::puts("Media Foundation round-trip passed");
     } catch (const std::exception& e) { std::fprintf(stderr,"%s\n",e.what()); status=1; }
     if (mf) MFShutdown();

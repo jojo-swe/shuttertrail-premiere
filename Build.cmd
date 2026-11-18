@@ -19,6 +19,9 @@ if errorlevel 1 exit /b 1
 cl %PMB_FLAGS% ..\tests\MotionBlurTest.cpp /Fe:MotionBlurTest.exe
 if errorlevel 1 exit /b 1
 MotionBlurTest.exe || exit /b 1
+cl %PMB_FLAGS% ..\tests\PreviewTest.cpp /Fe:PreviewTest.exe
+if errorlevel 1 exit /b 1
+PreviewTest.exe || exit /b 1
 cl %PMB_FLAGS% ..\tests\MediaFoundationTest.cpp /Fe:MediaFoundationTest.exe /link %PMB_LIBS%
 if errorlevel 1 exit /b 1
 set "PMB_FIXTURE=%TEMP%\motion-blur-%RANDOM%-%RANDOM%"

@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT
 (() => {
     'use strict';
-    const fs = require('fs'), path = require('path');
+    const fs = require('fs'), path = require('path'), os = require('os');
     const {spawn} = require('child_process');
     const {fileURLToPath} = require('url');
     const worker = path.join(path.dirname(fileURLToPath(location.href)), 'bin', 'MotionBlurWorker.exe');
     const el = id => document.getElementById(id);
-    let child = null, cancelled = false;
+    let child = null, cancelled = false, previewDir = '', images = null;
+    const controls = ['render','preview','samples','angle'];
+    const busy = on => { for (const id of controls) el(id).disabled = on; };
     // Remember the last shutter angle and sample count. Storage can be
     // unavailable, so every access is optional.
     const saved = key => { try { return localStorage.getItem('shuttertrail.'+key); } catch (_) { return null; } };
@@ -61,19 +63,62 @@
             child.on('error',reject);
             child.on('close',code => {
                 child=null;
-                if (cancelled) reject(Error('Render cancelled.'));
+                if (cancelled) reject(Error('Cancelled.'));
                 else if (code!==0) reject(Error(tail.trim() || 'Renderer exited with code '+code));
                 else resolve();
             });
         });
     }
     function cancel() { cancelled=true; if (child) child.kill(); }
+    function removePreview() {
+        if (previewDir) { try { fs.rmSync(previewDir,{recursive:true,force:true}); } catch (_) {} }
+        previewDir='';
+    }
     el('cancel').onclick=cancel;
-    window.addEventListener('beforeunload',cancel);
+    window.addEventListener('beforeunload',() => { cancel(); removePreview(); });
+
+    // Renders the frame under the playhead to two small images: blurred and original.
+    el('preview').onclick=async () => {
+        cancelled=false;
+        busy(true);
+        try {
+            const clip=await host('MotionBlurTimeline.preview()');
+            const [,source,frame,ticks,at,count,inside]=clip.fields;
+            if (!fs.existsSync(worker)) throw Error('Renderer is missing. Run Install.cmd first.');
+            removePreview();
+            previewDir=fs.mkdtempSync(path.join(os.tmpdir(),'shuttertrail-preview-'));
+            const base=path.join(previewDir,'frame'), angle=el('angle').value;
+            el('cancel').hidden=false;
+            el('status').textContent='Rendering preview …';
+            await run(['--preview',source,base,frame,ticks,angle,el('samples').value]);
+            const image=file => 'data:image/bmp;base64,'+fs.readFileSync(file).toString('base64');
+            images={blurred:image(base+'.bmp'), original:image(base+'-original.bmp')};
+            removePreview();
+            el('image').src=images.blurred;
+            el('figure').hidden=false;
+            el('caption').textContent='Clip frame '+(Number(at)+1)+' of '+count+' at '+angle+'°.'+
+                (inside==='1' ? '' : ' The playhead is outside the clip, so the nearest clip frame is shown.');
+            el('status').textContent='Ready.';
+        } catch (error) {
+            removePreview();
+            el('status').textContent=error.message;
+        } finally {
+            el('cancel').hidden=true;
+            busy(false);
+        }
+    };
+    // Hold the button (mouse, touch or Space/Enter) to see the original frame.
+    const show = which => { if (images) el('image').src=images[which]; };
+    for (const [event,which] of [['pointerdown','original'],['pointerup','blurred'],['pointerleave','blurred'],
+                                 ['keydown','original'],['keyup','blurred'],['blur','blurred']])
+        el('compare').addEventListener(event, e => {
+            if (e.type.startsWith('key') && e.key!==' ' && e.key!=='Enter') return;
+            show(which);
+        });
     el('render').onclick=async () => {
         let job='', completed='';
         cancelled=false;
-        for (const id of ['render','samples','angle']) el(id).disabled=true;
+        busy(true);
         try {
             const clip=await host('MotionBlurTimeline.inspect()');
             const [,source,project,start,count,ticks,target]=clip.fields;
@@ -105,7 +150,7 @@
             el('status').textContent=message;
         } finally {
             el('progress').hidden=true; el('cancel').hidden=true;
-            for (const id of ['render','samples','angle']) el(id).disabled=false;
+            busy(false);
         }
     };
 })();
