@@ -1,13 +1,23 @@
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
+set "PMB_WORKER="
+if exist "build\MotionBlurWorker.exe" set "PMB_WORKER=build\MotionBlurWorker.exe"
+if not defined PMB_WORKER if exist "bin\MotionBlurWorker.exe" set "PMB_WORKER=bin\MotionBlurWorker.exe"
+if not defined PMB_WORKER goto build
+echo Using prebuilt %PMB_WORKER%. Skipping Build.cmd.
+goto install
+:build
 call Build.cmd
 if errorlevel 1 goto failed
+set "PMB_WORKER=build\MotionBlurWorker.exe"
+:install
+if not exist "%PMB_WORKER%" goto failed
 set "PMB_DEST=%APPDATA%\Adobe\CEP\extensions\se.jojoswe.motionblur"
 if not exist "%PMB_DEST%\bin" mkdir "%PMB_DEST%\bin"
 xcopy "panel\*" "%PMB_DEST%\" /E /I /Y /Q >nul
 if errorlevel 1 goto failed
-copy /Y "build\MotionBlurWorker.exe" "%PMB_DEST%\bin\" >nul
+copy /Y "%PMB_WORKER%" "%PMB_DEST%\bin\MotionBlurWorker.exe" >nul
 if errorlevel 1 goto failed
 rem Per-user settings. CEP 11 and 12 cover the target host generations.
 for %%V in (11 12) do (

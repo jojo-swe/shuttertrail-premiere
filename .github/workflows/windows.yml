@@ -2,6 +2,7 @@ name: Windows build and render test
 on: [push, workflow_dispatch]
 permissions:
   contents: read
+  actions: write
 jobs:
   build:
     runs-on: windows-2022
@@ -21,3 +22,50 @@ jobs:
       - name: Test timeline guards
         shell: cmd
         run: node tests/TimelineTest.js
+      - name: Assemble the install package
+        shell: cmd
+        run: |
+          if exist package rmdir /s /q package
+          mkdir package
+          if errorlevel 1 exit /b 1
+          mkdir package\build
+          if errorlevel 1 exit /b 1
+          mkdir package\panel
+          if errorlevel 1 exit /b 1
+          xcopy panel package\panel\ /E /I /Y /Q >nul
+          if errorlevel 1 exit /b 1
+          copy /Y build\MotionBlurWorker.exe package\build\ >nul
+          if errorlevel 1 exit /b 1
+          copy /Y Install.cmd package\ >nul
+          if errorlevel 1 exit /b 1
+          copy /Y LICENSE package\ >nul
+          if errorlevel 1 exit /b 1
+          copy /Y README.md package\ >nul
+          if errorlevel 1 exit /b 1
+          if not exist package\panel\index.html exit /b 1
+          if not exist package\panel\CSXS\manifest.xml exit /b 1
+          if not exist package\panel\panel.js exit /b 1
+          if not exist package\panel\jsx\Timeline.jsx exit /b 1
+          if not exist package\build\MotionBlurWorker.exe exit /b 1
+          if not exist package\Install.cmd exit /b 1
+          if not exist package\LICENSE exit /b 1
+          if not exist package\README.md exit /b 1
+          if exist package\build\MotionBlurTest.exe exit /b 1
+          if exist package\build\MediaFoundationTest.exe exit /b 1
+          if exist package\*.exe exit /b 1
+          if exist package\*.mp4 exit /b 1
+          if exist package\*.log exit /b 1
+          if exist package\build\*.mp4 exit /b 1
+          if exist package\build\*.log exit /b 1
+          if exist package\build\*.pdb exit /b 1
+          if exist package\build\*.obj exit /b 1
+          if exist package\build\*.ilk exit /b 1
+          if exist package\panel\*.exe exit /b 1
+          dir /s /b package
+          exit /b 0
+      - name: Upload the install package
+        uses: actions/upload-artifact@v4
+        with:
+          name: shuttertrail-premiere-windows
+          path: package
+          if-no-files-found: error
