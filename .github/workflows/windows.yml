@@ -1,0 +1,23 @@
+name: Windows build and render test
+on: [push, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-2022
+    steps:
+      # Public repository checkout using the runner's installed Git.
+      - name: Fetch the revision under test
+        shell: pwsh
+        run: |
+          git init .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git fetch --depth=1 "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git" $env:GITHUB_SHA
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git checkout --detach FETCH_HEAD
+      - name: Build worker and run Windows media tests
+        shell: cmd
+        run: call Build.cmd
+      - name: Test timeline guards
+        shell: cmd
+        run: node tests/TimelineTest.js
