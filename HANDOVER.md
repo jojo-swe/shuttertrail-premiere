@@ -8,7 +8,8 @@ State on 2026-11-18, written at the end of a cloud session so that work can cont
 
 ## In progress
 
-- **`agent/claude/panel-refresh-controls`** (Claude Code, 2026-11-18): redesigned panel with a shutter disc, blur position (Behind/Centered/Ahead), strength, angle presets, 32-sample quality, live preview refresh and **Show render in Explorer**. The engine and worker take optional `phase strength`. Built and all tests passed locally with VS 18. Not yet tried inside Premiere; the TSan/ASan runs from `AGENTS.md` were not run (no g++/clang++ on this machine). Pushed, no PR yet.
+- **`agent/claude/panel-refresh-controls`** (Claude Code, 2026-11-18): redesigned panel with a shutter disc, blur position (Behind/Centered/Ahead), strength, angle presets, 32-sample quality, live preview refresh and **Show render in Explorer**. The engine and worker take optional `phase strength`. Built and all tests passed locally with VS 18, and in WSL Ubuntu (g++ 13) with `-Wall -Wextra -Wshadow`, `-fsanitize=thread` and `-fsanitize=address,undefined`. Not yet tried inside Premiere. PR #9.
+  - Measured in WSL on 6 cores, 1080p, 8 px/frame motion, 8 samples, median of 7: default 180° takes 0.271 s/frame on `main` and 0.265 s/frame on the branch, and the output is byte-identical. Trailing 180° takes 0.276 s and strength 50 % 0.255 s. Mean luma change against the original: 1.87 (default), 0.92 (strength 50 %, half as expected), 14.6 (trailing, larger because the trailing window shifts the image back by a quarter of the motion).
 - **Releases** (both are unpublished drafts, visible only to maintainers under *Releases*):
   - `v0.1.0-rc.2`: **the current candidate**, built from `main` at `11133df` (merge of #6). It contains everything listed below.
   - `v0.1.0-rc.1`: obsolete. It predates the engine work and can be deleted.
