@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Exercise the same reader and writer as the panel, using footage generated
 // in this process. The test executable takes an empty temporary folder.
-// Clips are synthetic: a moving-bar fixture, a zero-based frame-index clip,
-// and a clip whose timeline starts two seconds in. No external media is read.
+// Clips are synthetic: a moving-bar fixture and a frame-index clip.
+// Media Foundation reads both back with a nonzero first PTS. No external media is read.
 #define MOTION_BLUR_TEST_DRIVER
 #include "../worker/RenderClip.cpp"
 #include <filesystem>
@@ -78,10 +78,23 @@ i64 probeTimestamps(const wchar_t* path, i64 ticks, const char* label) {
         i64 pts=0;
         probe.read(pts);
         if (n==0) first=pts;
+        else if (probe.frameFor(pts-first)!=n) {
+            char message[160];
+            std::snprintf(message,sizeof(message),
+                "%s frame %d is not one frame after the first PTS %lld (pts %lld)",
+                label,n,first,pts);
+            need(false,message);
+        }
         std::printf(" %lld",pts);
     }
     std::printf("\n");
     std::fflush(stdout);
+    if (std::llabs(first)<=10000) {
+        char message[128];
+        std::snprintf(message,sizeof(message),
+            "%s did not expose a nonzero start timestamp (first PTS %lld)",label,first);
+        need(false,message);
+    }
     return first;
 }
 void checkOutput(const wchar_t* path, i64 ticks, int startFrame, int count, bool indexed) {
@@ -191,18 +204,6 @@ int wmain(int argc,wchar_t** argv) {
         run(indexed,indexOut,angle0);
         checkOutput(indexOut.c_str(),ticks,startFrame,count,true);
 
-        const i64 startOffset=2*hns;
-        const auto shifted=(dir/L"offset-source.mp4").wstring(), shiftOut=(dir/L"offset-trim.mp4").wstring();
-        writeFrames(shifted.c_str(),format,frames,startOffset,true);
-        const i64 offsetPts=probeTimestamps(shifted.c_str(),ticks,"offset-source.mp4");
-        run(shifted,shiftOut,angle0);
-        checkOutput(shiftOut.c_str(),ticks,startFrame,count,true);
-        if (offsetPts<=3*hns/2) {
-            char message[128];
-            std::snprintf(message,sizeof(message),
-                "Synthetic start offset was not preserved (first PTS %lld)",offsetPts);
-            need(false,message);
-        }
         std::puts("Media Foundation round-trip passed");
     } catch (const std::exception& e) { std::fprintf(stderr,"%s\n",e.what()); status=1; }
     if (mf) MFShutdown();
