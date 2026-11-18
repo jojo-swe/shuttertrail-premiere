@@ -12,7 +12,7 @@
         return new Promise((resolve,reject) => window.__adobe_cep__.evalScript(script, result => {
             try {
                 const fields = String(result).split('|').map(decodeURIComponent);
-                if (fields[0] !== 'OK') throw Error(fields[1] || 'Premiere kunde inte utföra tidslinjeanropet.');
+                if (fields[0] !== 'OK') throw Error(fields[1] || 'Premiere could not complete the timeline call.');
                 resolve({raw:result, fields});
             } catch (e) { reject(e); }
         }));
@@ -29,15 +29,15 @@
                     const m=/^(\d+)\/(\d+)\s*$/.exec(msg);
                     if (m) {
                         el('progress').value = Number(m[1])/Number(m[2]);
-                        el('status').textContent = 'Renderar bildruta '+m[1]+' av '+m[2]+'.';
+                        el('status').textContent = 'Rendering frame '+m[1]+' of '+m[2]+'.';
                     }
                 }
             });
             child.on('error',reject);
             child.on('close',code => {
                 child=null;
-                if (cancelled) reject(Error('Renderingen avbröts.'));
-                else if (code!==0) reject(Error(tail.trim() || 'Renderaren avslutades med kod '+code));
+                if (cancelled) reject(Error('Render cancelled.'));
+                else if (code!==0) reject(Error(tail.trim() || 'Renderer exited with code '+code));
                 else resolve();
             });
         });
@@ -52,7 +52,7 @@
         try {
             const clip=await host('MotionBlurTimeline.inspect()');
             const [,source,project,start,count,ticks,target]=clip.fields;
-            if (!fs.existsSync(worker)) throw Error('Renderaren saknas. Kör Install.cmd först.');
+            if (!fs.existsSync(worker)) throw Error('Renderer is missing. Run Install.cmd first.');
             const dir=path.join(path.dirname(project),'Motion Blur Renders');
             fs.mkdirSync(dir,{recursive:true});
             // Each job owns its own folder, including simultaneous renders in other projects.
@@ -61,21 +61,21 @@
             el('cancel').hidden=false;
             el('progress').hidden=false;
             el('progress').removeAttribute('value');
-            el('status').textContent='Öppnar källklippet …';
+            el('status').textContent='Opening the source clip …';
             await run([source,output,start,count,ticks,el('angle').value,el('samples').value]);
             completed=output;
             el('cancel').hidden=true;
-            el('status').textContent='Importerar och kontrollerar placeringen …';
+            el('status').textContent='Importing and verifying placement …';
             // URI encoding keeps filenames separate from executable ExtendScript syntax.
             await host('MotionBlurTimeline.place('+JSON.stringify(clip.raw)+','+
                        JSON.stringify(encodeURIComponent(output))+')');
-            el('status').textContent='Klar på V'+target+'.\n'+output;
+            el('status').textContent='Done on V'+target+'.\n'+output;
         } catch (error) {
             let message=error.message;
-            if (completed) message+='\nRenderfil: '+completed;
+            if (completed) message+='\nRender file: '+completed;
             else if (job) {
                 try { fs.rmSync(job,{recursive:true,force:true}); }
-                catch (_) { message+='\nArbetsmapp: '+job; }
+                catch (_) { message+='\nWorking folder: '+job; }
             }
             el('status').textContent=message;
         } finally {

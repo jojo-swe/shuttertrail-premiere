@@ -1,7 +1,27 @@
+# Build.cmd output (worker, test programs, objects)
 /build/
 *.obj
 *.exe
 *.pdb
 *.ilk
-.vs/
+*.exp
+*.lib
+
+# Install packages assembled by the Windows and release workflows
+/package/
+/dist/
+*.zip
+*.zip.sha256
+
+# Renders written next to a Premiere project kept inside the checkout
 Motion Blur Renders/
+
+# Editors and tools
+.vs/
+.vscode/
+.recall/
+
+# OS files
+Thumbs.db
+desktop.ini
+.DS_Store

@@ -1,0 +1,70 @@
+name: Release candidate
+# Builds the Windows package and attaches it to a draft pre-release.
+# Nothing is published until a maintainer reviews and publishes the draft by hand.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, for example v0.1.0-rc.1'
+        required: true
+permissions:
+  contents: write
+jobs:
+  package:
+    runs-on: windows-2022
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
+    steps:
+      - name: Fetch the revision under test
+        shell: pwsh
+        run: |
+          $auth = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("x-access-token:$env:GH_TOKEN"))
+          git init .
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git -c http.extraheader="AUTHORIZATION: basic $auth" fetch --depth=1 "$env:GITHUB_SERVER_URL/$env:GITHUB_REPOSITORY.git" $env:GITHUB_SHA
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          git checkout --detach FETCH_HEAD
+      - name: Build worker and run Windows media tests
+        shell: cmd
+        run: call Build.cmd
+      - name: Test timeline guards
+        shell: cmd
+        run: node tests/TimelineTest.js
+      - name: Assemble package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $name = "ShutterTrail-$env:RELEASE_TAG-win-x64"
+          $root = Join-Path dist $name
+          # Same layout as the CI artifact: Install.cmd finds build\MotionBlurWorker.exe
+          # and skips the compiler.
+          New-Item -ItemType Directory -Force (Join-Path $root 'build') | Out-Null
+          Copy-Item -Recurse panel (Join-Path $root 'panel')
+          Copy-Item build\MotionBlurWorker.exe (Join-Path $root 'build')
+          Copy-Item Install.cmd, README.md, LICENSE $root
+          Compress-Archive -Path $root -DestinationPath "dist\$name.zip"
+          $hash = (Get-FileHash "dist\$name.zip" -Algorithm SHA256).Hash.ToLower()
+          "$hash  $name.zip" | Set-Content -Encoding ascii "dist\$name.zip.sha256"
+          "PACKAGE=dist\$name.zip" | Out-File -Append -Encoding utf8 $env:GITHUB_ENV
+      - name: Attach to draft pre-release
+        shell: pwsh
+        run: |
+          $repo = $env:GITHUB_REPOSITORY
+          $files = @($env:PACKAGE, "$env:PACKAGE.sha256")
+          gh release view $env:RELEASE_TAG --repo $repo *> $null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $env:RELEASE_TAG @files --clobber --repo $repo
+          } else {
+            $notes = @"
+          Release candidate built from $env:GITHUB_SHA.
+
+          Unpack the zip, close Premiere Pro and run **Install.cmd**. No compiler is needed.
+          The worker is unsigned and the panel uses CEP developer mode (PlayerDebugMode).
+          Verify the SHA-256 checksum before installing.
+          "@
+            gh release create $env:RELEASE_TAG @files --repo $repo --draft --prerelease --target $env:GITHUB_SHA --title "ShutterTrail $env:RELEASE_TAG" --notes $notes
+          }
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }

@@ -2,54 +2,58 @@
 
 <img src="./shuttertrail-avatar.png" alt="ShutterTrail" width="128" height="128">
 
-En lokal Windows-panel för att ge ett trimmat klipp rörelseoskärpa i Adobe Premiere Pro. Markera klippet, välj slutarvinkel och rendera. Panelen importerar en ljudlös MP4 till samma tidsintervall på spåret direkt ovanför. Du kan växla mellan bilderna genom att slå av och på det övre spåret.
+A local Windows panel that adds motion blur to a trimmed clip in Adobe Premiere Pro. Select the clip, choose a shutter angle and render. The panel imports a silent MP4 into the same time range on the track directly above. You can compare the two by toggling the upper track on and off.
 
-## Kom igång på Windows 11 x64
+## Getting started on Windows 11 x64
 
-Det enkla sättet kräver inte Visual Studio Build Tools.
+The easy way does not need Visual Studio Build Tools.
 
-1. Ladda ner artefakten `shuttertrail-premiere-windows` från en grön körning av [Windows-arbetsflödet](https://github.com/jojo-swe/shuttertrail-premiere/actions/workflows/windows.yml). Samma paket kan också ligga under [Releases](https://github.com/jojo-swe/shuttertrail-premiere/releases) när ett släpp har publicerats där. Paketet innehåller `panel\`, `build\MotionBlurWorker.exe`, `Install.cmd`, `LICENSE` och `README.md`. Det innehåller inte testprogram, testfilm eller loggar.
-2. Packa upp paketet till en skrivbar mapp och stäng Premiere. Dubbelklicka på **Install.cmd**. Finns `build\MotionBlurWorker.exe` används den och **Build.cmd** körs inte. Saknas den men `bin\MotionBlurWorker.exe` finns, används den i stället. Saknas båda bygger **Install.cmd** workern med **Build.cmd** innan installationen.
-3. Starta en Premiere-version med CEP 11 eller 12. Öppna **Window → Extensions → Motion Blur**. Målgruppen är Premiere Pro 23–26 på värdar där CEP finns kvar. Versionsintervallet i manifestet är ingen verifierad kompatibilitetsmatris. Adobe har gått över till UXP för ny utveckling.
-4. Spara Premiere-projektet. Lägg ett kort, progressivt SDR-klipp i H.264 med konstant bildfrekvens på V1 i en sekvens med samma bildfrekvens. Skapa V2 om det behövs. Trimma gärna bort den första sekunden. Lämna intervallet på V2 ledigt och olåst.
-5. Markera klippet och börja med **180° och 8 prover**. Klicka på **Rendera till spåret ovanför**. Första resultatet sparas under `Motion Blur Renders` bredvid projektfilen. Mappen är en del av projektets media när du flyttar eller arkiverar projektet.
+1. Download `ShutterTrail-<version>-win-x64.zip` from [Releases](https://github.com/jojo-swe/shuttertrail-premiere/releases) and check it against the `.sha256` file next to it. Release candidates are marked as pre-releases. The same package is also available as the `shuttertrail-premiere-windows` artifact from any green run of the [Windows workflow](https://github.com/jojo-swe/shuttertrail-premiere/actions/workflows/windows.yml). The package contains `panel\`, `build\MotionBlurWorker.exe`, `Install.cmd`, `LICENSE` and `README.md`. It contains no test programs, test footage or logs.
+2. Unpack the package to a writable folder and close Premiere. Double-click **Install.cmd**. If `build\MotionBlurWorker.exe` exists, it is used and **Build.cmd** does not run. If it is missing but `bin\MotionBlurWorker.exe` exists, that file is used instead. If neither exists, **Install.cmd** builds the worker with **Build.cmd** before installing. On Windows N editions, the **Media Feature Pack** is also required.
+3. Start a Premiere version with CEP 11 or 12. Open **Window → Extensions → Motion Blur**. The target is Premiere Pro 23–26 on hosts where CEP is still available. The version range in the manifest is not a verified compatibility matrix. Adobe has moved to UXP for new development.
+4. Save the Premiere project. Put a short, progressive SDR H.264 clip with a constant frame rate on V1 in a sequence with the same frame rate. Create V2 if needed. Trimming off the first second is a good test. Leave the range on V2 empty and unlocked.
+5. Select the clip and start with **180° and 8 samples**. Click **Render to track above**. The first result is saved under `Motion Blur Renders` next to the project file. That folder is part of the project's media when you move or archive the project.
 
-Bygg från källkod bara när ingen färdig worker följer med. Installera då **Visual Studio 2022 Build Tools** med arbetsbelastningen **Desktop development with C++**, x64-kompilatorn och ett aktuellt Windows 10- eller 11-SDK. I Windows N behövs även **Media Feature Pack**. Packa upp källträdet och ta bort en eventuell `build\MotionBlurWorker.exe` eller `bin\MotionBlurWorker.exe`, annars installeras den filen utan ombyggnad. Kör sedan **Install.cmd**. Skriptet anropar **Build.cmd**, som länkar workern med statisk C/C++-runtime (`/MT`) och kör både bildtestet och ett riktigt H.264-test före installation. Den färdiga workern behöver inte Microsoft Visual C++ Redistributable.
+Build from source only when no prebuilt worker is included. Install **Visual Studio 2022 Build Tools** with the **Desktop development with C++** workload, the x64 compiler and a current Windows 10 or 11 SDK. Unpack the source tree and remove any `build\MotionBlurWorker.exe` or `bin\MotionBlurWorker.exe`, otherwise that file is installed without a rebuild. Then run **Install.cmd**. The script calls **Build.cmd**, which links the worker with the static C/C++ runtime (`/MT`) and runs both the image test and a real H.264 test before installing. The finished worker does not need the Microsoft Visual C++ Redistributable.
 
-Installationen kopierar panelen till `%APPDATA%\Adobe\CEP\extensions\se.jojoswe.motionblur` och aktiverar utvecklarläge för osignerade paneler genom användarens `PlayerDebugMode` i `HKCU\Software\Adobe\CSXS.11` och `CSXS.12`. Inställningen gäller även andra CEP-paneler för samma användare. För avinstallation, stäng Premiere och ta bort den installerade panelmappen. Återställ registervärdena till tidigare läge om du inte behöver dem för andra paneler.
+Installation copies the panel to `%APPDATA%\Adobe\CEP\extensions\com.shuttertrail.premiere` and enables developer mode for unsigned panels through the user's `PlayerDebugMode` in `HKCU\Software\Adobe\CSXS.11` and `CSXS.12`. This setting also applies to other CEP panels for the same user. To uninstall, close Premiere and delete the installed panel folder. Restore the registry values to their previous state if you do not need them for other panels.
 
-Byggverktyg: https://visualstudio.microsoft.com/visual-cpp-build-tools/  
-Premieres panelstöd: https://github.com/Adobe-CEP/Samples/tree/master/PProPanel
+Build tools: https://visualstudio.microsoft.com/visual-cpp-build-tools/  
+Premiere panel support: https://github.com/Adobe-CEP/Samples/tree/master/PProPanel
 
-## Bildresultat och begränsningar
+## Image output and limitations
 
-- **Slutarvinkel.** 180° simulerar exponering under en halv bildperiod, lika långt före och efter rutans mitt. Vid 25 fps motsvarar det 1/50 s. 0° ger en referens med samma H.264-omkodning. Redan inbakad oskärpa i källan finns kvar.
-- **4, 8 eller 16 prover.** Fler tidpunkter gör sammanvägningen finare och tar längre tid. Renderfilen har sekvensens bildfrekvens, även vid 24000/1001, 30000/1001 och 60000/1001. Motorn arbetar bildruta för bildruta i bakgrunden.
-- **Metod.** Motorn söker lokala förflyttningar i båda tidsriktningarna med blockmatchning på luminans, uppskattar delbilder vid provtidpunkterna och beräknar medelvärdet. Svaga matchningar vägs ned. Första och sista rutan får bara använda bilder inom trimningen. Detektorn för hårda klipp jämför luminanshistogram och kan missa klipp med liknande bildinnehåll. Snabba förflyttningar, upprepade mönster och objekt som skymmer varandra kan ge dubbla konturer. Beräkningen sker på CPU i videons kodade färgrymd.
-- **Källmaterial.** Den här versionen är avsedd för vanliga lokala H.264-klipp i MP4, 8-bitars SDR, kvadratiska pixlar, en videoström, spelhastighet 100 % och samma bildfrekvens som sekvensen. Renderingen skriver H.264 High, 4:2:0, utan ljud. Windows lokala avkodare och kodare bestämmer vilka storlekar de klarar.
-- **Premiere-effekter.** Panelen läser originalfilens bild före Lumetri, Motion/Scale, masker, opacitet, stabilisering och andra klippeffekter. Använd obehandlade klipp eller baka först in de effekter som ska synas. Speed ramps, underklipp med annan tidsbas, omtolkat material, nestade sekvenser, bildsekvenser, VFR, HDR, roterade mobilklipp och multicam ingår inte i stödet.
-- **Placering.** Behåll klippet markerat under jobbet. Panelen kontrollerar sekvens, klipp, trim och ledigt intervall igen före placeringen. Det finns ingen reservplacering på källspåret. Vid placeringsfel visas sökvägen till den färdiga filmen så att du kan använda den manuellt.
+- **Shutter angle.** 180° simulates exposure during half a frame period, equally before and after the frame's centre. At 25 fps this corresponds to 1/50 s. 0° gives a reference with the same H.264 re-encode. Blur already baked into the source remains.
+- **4, 8 or 16 samples.** More time points give a smoother blend and take longer. The render file uses the sequence frame rate, including 24000/1001, 30000/1001 and 60000/1001. The engine works frame by frame in the background.
+- **Method.** The engine searches for local motion in both time directions with block matching on luminance, estimates intermediate images at the sample times and averages them. Weak matches are weighted down. The first and last frames only use images inside the trim. The hard-cut detector compares luminance histograms and can miss cuts between similar-looking shots. Fast motion, repeating patterns and occluding objects can produce double edges. Processing runs on the CPU in the video's encoded colour space.
+- **Source material.** This version is meant for ordinary local H.264 clips in MP4, 8-bit SDR, square pixels, one video stream, 100 % playback speed and the same frame rate as the sequence. Rendering writes H.264 High, 4:2:0, without audio. The local Windows decoder and encoder determine which frame sizes are supported.
+- **Premiere effects.** The panel reads the original file's image before Lumetri, Motion/Scale, masks, opacity, stabilisation and other clip effects. Use unprocessed clips, or bake in the effects that should be visible first. Speed ramps, subclips with a different timebase, interpreted footage, nested sequences, image sequences, VFR, HDR, rotated phone clips and multicam are not supported.
+- **Placement.** Keep the clip selected during the job. The panel checks the sequence, clip, trim and free range again before placing the result. There is no fallback placement on the source track. If placement fails, the path to the finished movie is shown so you can use it manually.
 
-## Licens och innehåll
+## License and contents
 
-All projektspecifik källkod, skript, tester och dokumentation i detta repo släpps under MIT. Licenstexten finns i [LICENSE](LICENSE). Repot innehåller inga importerade kodbibliotek, tränade vikter, incheckade binärer, typsnitt, testklipp eller SDK-filer. Testfilmen skapas lokalt av testet. Windows-arbetsflödet kan publicera ett installationspaket med den kompilerade workern.
+All project-specific source code, scripts, tests and documentation in this repository are released under MIT. The license text is in [LICENSE](LICENSE). The repository contains no imported code libraries, trained weights, checked-in binaries, fonts, test clips or SDK files. The test movie is generated locally by the test. The Windows and release workflows publish an install package containing the compiled worker.
 
-| Del | Ursprung och distribution |
+| Part | Origin and distribution |
 | --- | --- |
-| Panel, rörelseberäkning, renderare, tester | Egen kod i repot, MIT |
-| Premiere Pro och CEP | Installerad Adobe-värd med egna villkor |
-| Media Foundation och H.264-codec | Windows systemkomponenter med egna villkor |
-| MSVC, standardbibliotek, Windows SDK, WRL | Byggverktyg och plattformsgränssnitt, bara när workern kompileras från källkod. `MotionBlurWorker.exe` länkas med `/MT`, så C/C++-runtime ingår i exe-filen. Målmaskinen behöver inte Microsoft Visual C++ Redistributable. Microsofts runtime är inte MIT och ingår inte som källkod i repot; den följer med den byggda exe-filen enligt villkoren för Visual Studio Build Tools. Projektets egen kod är MIT |
-| FFmpeg, RIFE, ncnn, Blur och Flowframes | Används inte |
+| Panel, motion estimation, renderer, tests | Own code in this repository, MIT |
+| Premiere Pro and CEP | Installed Adobe host with its own terms |
+| Media Foundation and H.264 codec | Windows system components with their own terms |
+| MSVC, standard library, Windows SDK, WRL | Build tools and platform interfaces, only needed when compiling the worker from source. `MotionBlurWorker.exe` is linked with `/MT`, so the C/C++ runtime is inside the executable and the target machine does not need the Microsoft Visual C++ Redistributable. Microsoft's runtime is not MIT and is not included as source in the repository; it ships inside the built executable under the Visual Studio Build Tools terms. The project's own code is MIT |
+| FFmpeg, RIFE, ncnn, Blur and Flowframes | Not used |
 
-MIT gäller materialet i repot. Adobe och Microsoft tillhandahåller värdprogram, verktyg och systemkomponenter separat. Installationspaketet från arbetsflödet innehåller panelen, `Install.cmd`, `LICENSE`, `README.md` och `build\MotionBlurWorker.exe` byggd med `/MT`. Paketet innehåller inte FFmpeg, RIFE, ncnn, modellvikter eller andra tredjepartsbibliotek.
+MIT covers the material in this repository. Adobe and Microsoft provide host applications, tools and system components separately. The install package contains the panel, `Install.cmd`, `LICENSE`, `README.md` and `build\MotionBlurWorker.exe` built with `/MT`. It contains no FFmpeg, RIFE, ncnn, model weights or other third-party libraries. Media Foundation and the H.264 codec come from Windows.
 
-## Utveckling och verifiering
+## Development and verification
 
-- **Build.cmd** bygger endast i `build/` och kör Windows-testerna. Det installerar ingen panel. Workern och testprogrammen länkas med `/MT`. Windows-testet skapar en 60-rutors H.264-video i 30000/1001 fps, renderar nio rutor från källruta 37, avkodar resultatet och kontrollerar bildinnehåll, tidsstämplar och antal bildrutor.
-- **Install.cmd** kopierar panelen till CEP-mappen och `MotionBlurWorker.exe` till panelens `bin\`. Finns en färdig worker i `build\` används den. Annars används `bin\MotionBlurWorker.exe` om den finns. Saknas båda körs **Build.cmd** först.
-- **tests/MotionBlurTest.cpp** provar statisk bild, känd förflyttning, två exponeringslängder, 0°, neutral krominans, klippgräns och en enskild bildruta. På Linux/macOS kan det köras med `c++ -std=c++17 -O2 tests/MotionBlurTest.cpp -o /tmp/motion-test && /tmp/motion-test`.
-- **tests/TimelineTest.js** kör ExtendScript-koden mot en simulerad värd. Kör `node tests/TimelineTest.js`. Testet kontrollerar även trim, saknat eller låst målspår, överlapp och ändrad sekvens.
-- GitHub Actions kör Windows-bygget och testerna vid push till ett publikt repo. När båda har gått igenom laddas installationspaketet upp som artefakten `shuttertrail-premiere-windows`. Värdintegrationen behöver dessutom provas i den Premiere-version du tänker stödja. Jämför särskilt in/ut vid trimning, bildens färg och placeringen vid 29,97 fps.
+- **Build.cmd** only builds inside `build/` and runs the Windows tests. It does not install any panel. The worker and test programs are linked with `/MT`. The Windows test creates a 60-frame H.264 video at 30000/1001 fps, renders nine frames starting at source frame 37, decodes the result and checks image content, timestamps and frame count.
+- **Install.cmd** copies the panel to the CEP folder and `MotionBlurWorker.exe` to the panel's `bin\`. A prebuilt worker in `build\` is used if present, otherwise `bin\MotionBlurWorker.exe` if present. If neither exists, **Build.cmd** runs first.
+- **tests/MotionBlurTest.cpp** tests a static image, known motion, two exposure lengths, 0°, neutral chroma, a cut boundary and a single frame. On Linux/macOS it can be run with `c++ -std=c++17 -O2 tests/MotionBlurTest.cpp -o /tmp/motion-test && /tmp/motion-test`.
+- **tests/TimelineTest.js** runs the ExtendScript code against a simulated host. Run `node tests/TimelineTest.js`. The test also checks trim, missing or locked target tracks, overlap and a changed sequence.
+- GitHub Actions runs the Windows build and tests on every push. When both pass, the install package is uploaded as the `shuttertrail-premiere-windows` artifact. Host integration must also be tried in the Premiere version you intend to support. Pay particular attention to in/out points when trimming, image colour and placement at 29.97 fps.
 
-Panelens UI finns i `panel/`, tidslinjeanropen i `panel/jsx/Timeline.jsx`, rörelseberäkningen i `worker/MotionBlur.hpp` och Windows-kopplingen i `worker/RenderClip.cpp`.
+### Releases
+
+`.github/workflows/release.yml` builds and tests the package, then attaches the zip and its SHA-256 checksum to a **draft pre-release**. Start it by pushing a tag such as `v0.1.0-rc.1`, or run the workflow manually with a tag name. Nothing becomes public until a maintainer reviews the draft and publishes it.
+
+The panel UI lives in `panel/`, the timeline calls in `panel/jsx/Timeline.jsx`, the motion estimation in `worker/MotionBlur.hpp` and the Windows integration in `worker/RenderClip.cpp`.

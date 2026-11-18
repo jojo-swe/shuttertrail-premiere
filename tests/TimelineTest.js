@@ -3,6 +3,7 @@
 const fs=require('fs'), path=require('path'), vm=require('vm'), assert=require('assert');
 const step=8475667200, time=n=>({ticks:String(n*step), seconds:n*1001/30000});
 const list=items=>Object.assign(items,{numItems:items.length});
+// The non-ASCII name and the '|' delimiter in the path exercise the URI-encoded fields.
 const file='C:\\footage\\Åsa | shot.mp4', output='C:\\test\\render.mp4';
 const item={nodeId:'src',isSequence:()=>false,isOffline:()=>false,getMediaPath:()=>file,
             getFootageInterpretation:()=>({frameRate:30000/1001})};

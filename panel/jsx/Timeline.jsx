@@ -16,41 +16,41 @@ var MotionBlurTimeline = (function () {
     }
     function capture() {
         var project=app.project, seq=project.activeSequence;
-        if (!seq || !project.path) fail("Öppna en sekvens och spara projektet först.");
+        if (!seq || !project.path) fail("Open a sequence and save the project first.");
         var clip=null, index=-1;
         for (var t=0; t<seq.videoTracks.numTracks; ++t) {
             var items=seq.videoTracks[t].clips;
             for (var i=0; i<items.numItems; ++i) if (items[i].isSelected()) {
-                if (clip) fail("Markera exakt ett videoklipp.");
+                if (clip) fail("Select exactly one video clip.");
                 clip=items[i]; index=t;
             }
         }
-        if (!clip) fail("Markera ett videoklipp på tidslinjen.");
+        if (!clip) fail("Select a video clip in the timeline.");
         var item=clip.projectItem;
         if (!item || item.isSequence() || item.isOffline() || !item.getMediaPath())
-            fail("Välj ett lokalt videoklipp med tillgängligt originalmedia.");
+            fail("Choose a local video clip whose original media is available.");
         if (clip.getSpeed()!==1 || clip.isSpeedReversed() || clip.disabled)
-            fail("Klippet måste vara aktivt och spelas framåt i 100 %.");
-        if (index+1>=seq.videoTracks.numTracks) fail("Skapa ett videospår direkt ovanför klippet.");
+            fail("The clip must be enabled and play forward at 100 %.");
+        if (index+1>=seq.videoTracks.numTracks) fail("Create a video track directly above the clip.");
         var target=seq.videoTracks[index+1];
         if ((target.isLocked && target.isLocked()) || target.isMuted())
-            fail("Lås upp och aktivera spåret ovanför.");
+            fail("Unlock and enable the track above.");
         if (overlaps(target.clips,clip) || overlaps(target.transitions,clip))
-            fail("Intervallet på videospåret ovanför är upptaget.");
+            fail("The range on the video track above is occupied.");
         if (overlaps(seq.videoTracks[index].transitions,clip))
-            fail("Klippet har en övergång. Rendera ett fristående klipp först.");
+            fail("The clip has a transition. Render a standalone clip first.");
         var step=Number(seq.timebase);
         function frame(time) {
             var n=Number(time.ticks)/step, rounded=Math.round(n);
-            if (Math.abs(n-rounded)>0.00001) fail("Klippgränsen ligger mellan sekvensens bildrutor.");
+            if (Math.abs(n-rounded)>0.00001) fail("The clip boundary falls between sequence frames.");
             return rounded;
         }
         var start=frame(clip.inPoint), count=frame(clip.end)-frame(clip.start);
         if (start<0 || count<1 || frame(clip.outPoint)-start!==count)
-            fail("Källans trimning och sekvensens längd måste motsvara varandra.");
+            fail("The source trim and the sequence duration must match.");
         var info=item.getFootageInterpretation();
         if (info && info.frameRate>0 && Math.abs(info.frameRate-254016000000/step)>0.002)
-            fail("Klippet och sekvensen måste ha samma bildfrekvens.");
+            fail("The clip and the sequence must have the same frame rate.");
         var state=reply(["OK",item.getMediaPath(),project.path,start,count,step,index+2,
                          seq.sequenceID,clip.nodeId,item.nodeId,clip.start.ticks,clip.end.ticks,target.id]);
         return {state:state, project:project, clip:clip, target:target};
@@ -62,19 +62,19 @@ var MotionBlurTimeline = (function () {
         place:function (expected, encodedFile) {
             try {
                 var now=capture();
-                if (now.state!==expected) fail("Klippet, markeringen eller sekvensen ändrades under renderingen.");
+                if (now.state!==expected) fail("The clip, selection or sequence changed during the render.");
                 var file=decodeURIComponent(encodedFile), bin=now.project.getInsertionBin();
-                if (!now.project.importFiles([file],true,bin,false)) fail("Premiere kunde inte importera MP4-filen.");
+                if (!now.project.importFiles([file],true,bin,false)) fail("Premiere could not import the MP4 file.");
                 var found=bin.findItemsMatchingMediaPath(file,true);
-                if (!found || !found.length) fail("Det importerade projektobjektet kunde inte hittas.");
+                if (!found || !found.length) fail("The imported project item could not be found.");
                 var imported=found[0], duration=now.clip.end.seconds-now.clip.start.seconds;
                 var importedDuration=imported.getOutPoint(1).seconds-imported.getInPoint(1).seconds;
                 var step=Number(now.project.activeSequence.timebase)/254016000000;
                 if (Math.abs(importedDuration-duration)>step*0.1)
-                    fail("Premiere tolkar renderfilens längd annorlunda. Filen finns i projektpanelen.");
+                    fail("Premiere interprets the render file's duration differently. The file is in the Project panel.");
                 // Import may trigger host updates. Repeat all timeline checks.
                 now=capture();
-                if (now.state!==expected) fail("Tidslinjen ändrades vid importen.");
+                if (now.state!==expected) fail("The timeline changed during import.");
                 now.target.overwriteClip(imported,now.clip.start.ticks);
                 var clips=now.target.clips;
                 for (var i=0; i<clips.numItems; ++i) {
@@ -82,7 +82,7 @@ var MotionBlurTimeline = (function () {
                         clips[i].start.ticks===now.clip.start.ticks && clips[i].end.ticks===now.clip.end.ticks)
                         return "OK";
                 }
-                fail("Placeringen kunde inte verifieras. Kontrollera spåret och dess låsning.");
+                fail("Placement could not be verified. Check the track and its lock state.");
             } catch (e) { return reply(["ERR",e.message]); }
         }
     };
