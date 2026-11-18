@@ -30,13 +30,13 @@ Measured on synthetic frames in a 4-core container:
 
 ## To do by hand (maintainer)
 
-1. **Test rc.2 in Premiere.** Download the zip from the rc.2 draft, close Premiere, delete any old `%APPDATA%\Adobe\CEP\extensions\se.jojoswe.motionblur`, then run `Install.cmd`. Check:
+1. **Test the newest release candidate (rc.3 or later; rc.2 does not appear in newer Premiere versions) in Premiere.** Download the zip from the rc.2 draft, close Premiere, delete any old `%APPDATA%\Adobe\CEP\extensions\se.jojoswe.motionblur`, then run `Install.cmd`. Check:
    - **Preview at playhead** shows an image, the caption names the right clip frame, and **Hold to compare with the original** toggles it. This is untested in a real host.
    - A fast pan gets blur along the motion, and edges are clean around moving objects.
    - The first and last frames of a trimmed clip look as blurred as the middle.
    - Placement on the track above at 23.976, 25 and 29.97 fps. Colours match the source.
    - Render time on a real clip. The panel shows time left.
-2. **Publish rc.2** when it's good, and delete the rc.1 draft.
+2. **Publish that candidate** when it's good, and delete the older drafts.
 3. **Upload the social preview.** Go to *Settings → General → Social preview* and upload `.github/social-preview.png`. There is no API for this.
 4. **Look at Devin's flag on #5.** Devin Review reported one flag on PR #5 that is only visible in its app, at https://app.devin.ai/review/jojo-swe/shuttertrail-premiere/pull/5. Devin's later review of #6 found no issues.
 5. Optional: delete the merged branches `claude/readme-release-setup-sobp9f` and `cursor/nonzero-pts-frame-mapping-113e` on GitHub.
@@ -48,7 +48,7 @@ Measured on synthetic frames in a 4-core container:
   - Showing a BMP `data:` URL in CEP's Chromium is only tested against a mock. The CSP allows `img-src data:`.
 - **Real footage:** all quality numbers come from synthetic textures. The confidence formula (`1 - SAD/(36*28)`) and the `crossCheck` tolerance (`1.5 + 0.1·|v|` px, fading to zero over 3 px) have not been tuned on real clips.
 - **Pure white noise:** the greedy step search can lock onto the wrong vector when motion isn't a multiple of its step. Natural images are smooth enough, but it shows up in synthetic tests that use per-pixel noise.
-- **Host limits:** CEP is being replaced by UXP in Premiere, and the manifest range `[23.0,26.99]` is not a verified compatibility matrix. Installing sets `PlayerDebugMode` for CEP 11 and 12, because the panel is unsigned.
+- **Host limits:** CEP is being replaced by UXP in Premiere, and the manifest allows `[23.0,99.9]` without a verified compatibility matrix. Installing sets `PlayerDebugMode` for CSXS 11–15, because the panel is unsigned. **rc.2 did not show up under Window → Extensions on the maintainer's machine.** Likely causes: its manifest stops at Premiere 26.99 and it only set `PlayerDebugMode` for CSXS 11–12. Both are changed on `main` after rc.2, but not yet confirmed in Premiere; build rc.3 and check that the panel appears (README → *Panel does not appear* has the log steps).
 
 ## Backlog (suggested order)
 

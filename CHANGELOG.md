@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased (planned as 0.1.0-rc.2)
+## Unreleased (planned as 0.1.0-rc.3)
+
+### Fixed
+- **The panel could be missing from Window → Extensions in newer Premiere versions.** The manifest no longer stops at Premiere 26, and **Install.cmd** enables unsigned panels for CSXS 11–15 instead of only 11–12.
+
+### Docs
+- README: troubleshooting steps for a panel that does not appear.
+
+## 0.1.0-rc.2 (draft, not published)
 
 ### New
 - **Preview at playhead.** Renders the frame under the playhead in the selected clip within a second or two, exactly as the final file will look, at reduced size. Hold **Hold to compare with the original** to see it without blur.

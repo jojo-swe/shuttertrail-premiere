@@ -19,8 +19,9 @@ xcopy "panel\*" "%PMB_DEST%\" /E /I /Y /Q >nul
 if errorlevel 1 goto failed
 copy /Y "%PMB_WORKER%" "%PMB_DEST%\bin\MotionBlurWorker.exe" >nul
 if errorlevel 1 goto failed
-rem Per-user settings. CEP 11 and 12 cover the target host generations.
-for %%V in (11 12) do (
+rem Per-user settings. Premiere 2022-2024 use CEP 11, 2025 uses CEP 12 and
+rem newer releases read later keys. Setting a key that no host uses is harmless.
+for %%V in (11 12 13 14 15) do (
     reg add "HKCU\Software\Adobe\CSXS.%%V" /v PlayerDebugMode /t REG_SZ /d 1 /f >nul
     if errorlevel 1 goto failed
 )
