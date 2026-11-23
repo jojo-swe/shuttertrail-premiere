@@ -8,7 +8,11 @@
     const el = id => document.getElementById(id);
     let child = null, cancelled = false, previewDir = '', images = null;
     const controls = ['render','preview','settings'];
-    const busy = on => { for (const id of controls) el(id).disabled = on; };
+    const busy = on => {
+        for (const id of controls) el(id).disabled = on;
+        if (on) el('status').classList.remove('error');
+    };
+    const fail = text => { el('status').textContent = text; el('status').classList.add('error'); };
     // Remember the last settings. Storage can be unavailable, so every
     // access is optional.
     const saved = key => { try { return localStorage.getItem('shuttertrail.'+key); } catch (_) { return null; } };
@@ -142,7 +146,7 @@
             el('status').textContent='Ready.';
         } catch (error) {
             removePreview();
-            el('status').textContent=error.message;
+            fail(error.message);
         } finally {
             el('cancel').hidden=true;
             busy(false);
@@ -195,7 +199,7 @@
                 try { fs.rmSync(job,{recursive:true,force:true}); }
                 catch (_) { message+='\nWorking folder: '+job; }
             }
-            el('status').textContent=message;
+            fail(message);
         } finally {
             el('progress').hidden=true; el('cancel').hidden=true;
             busy(false);

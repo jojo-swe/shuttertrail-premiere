@@ -10,6 +10,10 @@
 - The preview updates by itself when a setting changes, and **Show render in Explorer** appears after a render.
 - The worker accepts optional `phase strength` arguments after `angle samples`, in both render and preview mode. Older command lines still work.
 
+### Panel feedback
+
+- Errors such as "Select a video clip in the timeline." are shown in a highlighted box, and the panel starts with a one-line how-to instead of "Ready.". In rc.4 the message was easy to miss and the panel looked like it did nothing.
+
 ### Build
 - **Build.cmd** also removes the preview images from its temporary test folder, so the folder no longer stays behind.
 

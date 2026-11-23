@@ -64,4 +64,5 @@ figcaption { color: var(--muted); font-size: .9em; margin: .3rem 0 0 }
 .primary:hover:not(:disabled) { background: #f6bb5e; border-color: #f6bb5e }
 progress { accent-color: var(--amber); height: .5rem }
 #status { white-space: pre-wrap; overflow-wrap: anywhere; margin: .4rem 0 }
+#status.error { padding: .5rem .6rem; border: 1px solid var(--amber); border-radius: 6px; background: #3a2a14; color: #fff }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap }

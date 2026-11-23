@@ -84,3 +84,4 @@ Install.cmd            :: copies the panel and worker into the CEP extensions fo
 
 - 2026-11-18, Claude Code: panel redesign and new controls (blur position, strength, presets, 32 samples, live preview refresh, Show in Explorer) on `agent/claude/panel-refresh-controls`; Build.cmd now also cleans up preview BMPs.
 - 2026-11-18, Claude Code: sanitizer runs and 1080p measurements for PR #9; CHANGELOG split into rc.3 and rc.4; draft release v0.1.0-rc.4 started from `agent/claude/panel-refresh-controls`.
+- 2026-11-23, Claude Code: "panel does nothing" in Premiere 2027 traced through the CEP debug port: script, Node and ExtendScript all work, but no clip was selected and the error line was easy to miss. Errors now show in a highlighted box and the panel starts with a how-to. Verified live in Premiere 27.0 by reloading the installed panel. Not in the rc.4 draft; needs a new rc.
